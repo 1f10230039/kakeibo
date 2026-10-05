@@ -3,7 +3,7 @@
 
 import * as C from '../calc.js';
 import * as api from '../api.js';
-import { esc, money, icon, toast } from '../ui.js';
+import { esc, money, icon, toast, seg, selectSeg } from '../ui.js';
 import { categoryPicker, openDetail } from './sheets.js';
 import { row } from './home.js';
 
@@ -42,6 +42,7 @@ export const key = {
 // ---- S-06 未分類の振り分け ----
 
 let skipped = new Set();
+let lastSortId = null; // 前に出していた利用。違う利用に進んだら、カードを右からすべり込ませる
 
 export const unclassified = {
   render(ctx) {
@@ -51,10 +52,12 @@ export const unclassified = {
       return `<div class="page">${backBar('未分類の振り分け')}<p class="empty big">振り分けを待っている利用はありません 🎉</p></div>`;
     }
     const t = items[0];
+    const advanced = !ctx.entering && lastSortId !== null && lastSortId !== t.id;
+    lastSortId = t.id;
     return `<div class="page sorter">
       ${backBar('未分類の振り分け')}
       <p class="progress">残り ${items.length} 件</p>
-      <section class="sort-card card">
+      <section class="sort-card card${advanced ? ' advance' : ''}">
         <div class="sort-merchant">${esc(t.merchant || (t.source === '手入力' ? '手入力' + (t.memo ? '：' + t.memo : '') : '（店名なし）'))}</div>
         <div class="big">${money(t.amount, ctx.hidden)}</div>
         <div class="compare">${esc(C.mdw(C.parseYmd(t.date)))}・${esc(t.status)}</div>
@@ -109,7 +112,7 @@ export const menu = {
       <div class="list card">
         <a class="row link" href="#/rules"><span class="t"><b>カテゴリの対応表</b><small>店 → カテゴリ（${ctx.data.rules.length}件）</small></span>${icon('chevron')}</a>
         <div class="row"><span class="t"><b>週の始まり</b><small>統計の「週」と、ホームの「今週」</small></span>
-          <div class="seg"><button class="${s.weekStart === '月' ? 'on' : ''}" data-week="月">月曜</button><button class="${s.weekStart === '日' ? 'on' : ''}" data-week="日">日曜</button></div></div>
+          ${seg('week', [['月', '月曜'], ['日', '日曜']], s.weekStart, '週の始まり')}</div>
         <div class="row"><span class="t"><b>予算の設定</b><small>段階②で作ります</small></span></div>
         <div class="row"><span class="t"><b>CSV の取り込みと照合</b><small>e-NAVI の CSV の形がわかってから作ります</small></span></div>
       </div>
@@ -127,7 +130,11 @@ export const menu = {
     </div>`;
   },
   mount(root, ctx) {
-    root.querySelectorAll('[data-week]').forEach(b => b.addEventListener('click', () => ctx.write(api.setSetting('週の始まり', b.dataset.week), `週の始まりを${b.dataset.week}曜にしました`)));
+    root.querySelectorAll('[data-week]').forEach(b => b.addEventListener('click', async () => {
+      if (b.classList.contains('on')) return;
+      selectSeg(b); // 返事を待たずに背景を動かす。失敗したら元に戻す
+      if (!(await ctx.write(api.setSetting('週の始まり', b.dataset.week), `週の始まりを${b.dataset.week}曜にしました`))) ctx.rerender();
+    }));
     root.querySelector('[data-act="refresh"]').addEventListener('click', () => ctx.refresh(true));
     root.querySelector('[data-act="forget"]').addEventListener('click', () => {
       if (!confirm('この端末に保存した URL と合言葉を消しますか？')) return;

@@ -1,8 +1,13 @@
 /* 家計簿の見た目。色と文字は時間帯で3つのテーマを切り替える（js/theme.js）。
    A 朝の光（朝・夕方）／B 森と余白（昼）／C 夜の静けさ（夜）。docs/design/home_3案.html と同じ値。 */
 
-/* タブバーの下の空き。iPhone（下の余白 34px）では下から 48px。余白のない画面では 14px */
-:root { --tab-bottom: calc(env(safe-area-inset-bottom) + 14px); }
+/* タブバーのアイコンの並びの下の空き。iPhone（下の余白 34px）では下から 48px。余白のない画面では 14px */
+:root { --tab-bottom: calc(env(safe-area-inset-bottom) + 14px);
+  /* 画面の角の丸み。iPhone 16 は 55pt（ScreenCorners の一覧。CSS からは読めないので数字で持つ）。
+     --edge はタブバーと画面のふちの空き（左右と下でそろえる） */
+  --screen-r: 55px; --edge: 10px;
+  /* 動きの速さの変わり方：--ease すっと止まる／--spring 少しだけ行きすぎて戻る／--sheet iPhone のシートに近い */
+  --ease: cubic-bezier(.22, 1, .36, 1); --spring: cubic-bezier(.34, 1.45, .64, 1); --sheet: cubic-bezier(.32, .72, 0, 1); }
 :root, [data-theme="a"] {
   --bg: #f6f2ec; --card: #fffdf9; --ink: #1f2a44; --ink2: #6b6f7a; --line: #e7e0d6;
   --accent: #1f2a44; --accent-ink: #fffdf9; --soft: #efe8dd; --bar: #d9cfc1;
@@ -39,6 +44,12 @@ body { margin: 0; overscroll-behavior: none; background: var(--bg); color: var(-
   transition: background .4s; -webkit-tap-highlight-color: transparent; }
 a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+/* 押したとき：ボタンは少し縮み、一覧の行は背景がふわっと付く（iPhone では app.js の touchstart があって初めて出る） */
+button, a { transition: scale .22s var(--ease), background-color .25s, color .25s, opacity .25s, box-shadow .25s; }
+:is(.btn, .chip, .pick, .icon-btn, .nav, .back, .sheet-close, .more, .tab, .seg button, .legend-cat):active:not(:disabled) { scale: .94; transition-duration: .08s; }
+.tile:active { scale: .97; transition-duration: .1s; }
+:is(button, a).row:active, .legend-row:active { background-color: var(--soft); transition-duration: .05s; }
+.safe-probe { position: fixed; padding-bottom: env(safe-area-inset-bottom); visibility: hidden; pointer-events: none; }
 svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .money, .big, .num, .amt, .a, .rank, .val { font-variant-numeric: lining-nums; }
 
@@ -47,7 +58,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
    下に固定したタブバーがステータスバーの高さ（指1本分）だけ上にずれた（10/6 本人の iPhone。ホームだけ正しかった）。
    「ちょうど画面いっぱい」ではまだずれたので、ステータスバーの高さ＋1px だけ長くする。 */
 #app { max-width: 480px; margin: 0 auto; padding-bottom: calc(84px + var(--tab-bottom));
-  min-height: calc(100vh + env(safe-area-inset-top) + 1px); }
+  min-height: calc(100vh + env(safe-area-inset-top) + 1px); overflow-x: clip; /* 横から入ってくる動きの間、横にはみ出さない */ }
 .card { background: var(--card); border-radius: 24px; }
 .label { font-size: 12px; letter-spacing: .14em; color: var(--ink2); }
 .empty { color: var(--ink2); font-size: 13px; margin: 8px 20px 0; }
@@ -55,10 +66,14 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
 .muted { color: var(--ink2); }
 
 /* ---- ホーム ---- */
-.hero { height: calc(330px + env(safe-area-inset-top)); background: var(--hero-shade), var(--hero-img) center/cover; position: relative; }
-.hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.32) 0%, rgba(0,0,0,0) 42%); }
-.top { position: absolute; z-index: 1; inset: 0 0 auto 0; display: flex; justify-content: space-between; align-items: flex-start;
-  padding: calc(22px + env(safe-area-inset-top)) 22px 0; color: #fff; }
+.hero { height: calc(330px + env(safe-area-inset-top)); position: relative; overflow: hidden; isolation: isolate; background: var(--bg); }
+/* 写真は開いたときに、少し大きいところからゆっくり落ち着く */
+.hero-img { position: absolute; inset: 0; background: var(--hero-img) center/cover; animation: hero-in 1.6s var(--ease) both; }
+.hero::before, .hero::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.hero::before { background: linear-gradient(180deg, rgba(0,0,0,.32) 0%, rgba(0,0,0,0) 42%); }
+.hero::after { background: var(--hero-shade); }
+.top { position: absolute; z-index: 2; inset: 0 0 auto 0; display: flex; justify-content: space-between; align-items: flex-start;
+  padding: calc(22px + env(safe-area-inset-top)) 22px 0; color: #fff; animation: fade-down .8s .15s var(--ease) both; }
 .month { font-family: var(--font-head); font-size: 15px; letter-spacing: .12em; opacity: .9; }
 .greet { font-family: var(--font-head); font-size: 21px; margin-top: 4px; letter-spacing: .04em; white-space: nowrap; text-shadow: 0 1px 12px rgba(0,0,0,.18); }
 .greet.long { font-size: 17px; }
@@ -88,13 +103,17 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
 .section h2 { font-family: var(--font-head); font-weight: 500; font-size: 18px; margin: 0; letter-spacing: .06em; }
 .more { font-size: 12px; color: var(--ink2); display: inline-flex; align-items: center; }
 .more svg { width: 14px; height: 14px; }
-.seg { display: inline-flex; background: var(--soft); border-radius: 16px; padding: 3px; font-size: 12px; flex-shrink: 0; }
-.seg button { padding: 5px 12px; border-radius: 13px; color: var(--ink2); }
-.seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+/* 切り替えボタン：白い背景（::before）が、選んだほうへすべって動く。--i は選んでいる番号、--n はボタンの数（ui.js の seg） */
+.seg { --i: 0; --n: 2; position: relative; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--soft); border-radius: 16px; padding: 3px; font-size: 12px; flex-shrink: 0; }
+.seg::before { content: ""; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / var(--n)); border-radius: 13px;
+  background: var(--card); box-shadow: 0 1px 4px rgba(0,0,0,.08); transform: translateX(calc(var(--i) * 100%)); transition: transform .45s var(--spring); }
+.seg button { position: relative; z-index: 1; padding: 5px 12px; border-radius: 13px; color: var(--ink2); }
+.seg button.on { color: var(--ink); }
 
 .tiles { display: flex; gap: 12px; overflow-x: auto; padding: 0 20px 4px; scroll-padding: 0 20px; scrollbar-width: none; scroll-snap-type: x mandatory; }
 .tiles::-webkit-scrollbar { display: none; }
-.tile { flex: 0 0 150px; height: 190px; border-radius: 24px; position: relative; overflow: hidden; color: #fff; background: center/cover var(--soft); scroll-snap-align: start; }
+.tile { flex: 0 0 150px; height: 190px; border-radius: 24px; position: relative; overflow: hidden; color: #fff; background: center/cover var(--soft); scroll-snap-align: start;
+  animation: tile-in .55s var(--ease) both; animation-delay: calc(var(--i, 0) * 45ms); }
 .tile::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.05) 30%, rgba(0,0,0,.55) 100%); }
 .tile > * { position: relative; z-index: 1; }
 .tile .rank { position: absolute; top: 12px; left: 12px; width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,.85); color: #222;
@@ -157,53 +176,76 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
 /* ---- 統計 ---- */
 .controls { display: flex; justify-content: space-between; gap: 8px; margin: 10px 20px 0; }
 .period { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 14px 20px 10px; font-family: var(--font-head); font-size: 16px; letter-spacing: .04em; }
+/* 期間の名前：前後に動いたら、その向きからすべり込む（単位を変えたときは、ふわっと） */
+.period-label { display: grid; min-width: 9.5em; text-align: center; overflow: hidden; }
+.period-label > span { grid-area: 1 / 1; animation: fade-in .35s var(--ease) both; }
+.stats[data-dir="1"] .period-label > span { animation-name: in-from-right; }
+.stats[data-dir="-1"] .period-label > span { animation-name: in-from-left; }
 .period .nav { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--soft); }
 .period .nav:disabled { opacity: .3; cursor: default; }
 .period .nav svg { width: 18px; height: 18px; }
 .chart { margin: 0 20px; padding: 18px 16px 12px; touch-action: pan-y; }
 .chart-total { display: flex; justify-content: space-between; align-items: baseline; padding: 0 6px 6px; }
 .chart-total .money { font-family: var(--font-num); font-weight: var(--num-weight); font-size: 28px; }
-.bars { width: 100%; height: auto; display: block; }
-.bar { cursor: pointer; }
-.bar .hit { fill: transparent; stroke: none; }
-.bar .fill { fill: var(--bar); stroke: none; transition: fill .2s; }
-.bar.on .fill { fill: var(--accent); }
-.bar .lab { fill: var(--ink2); stroke: none; font-size: 11px; text-anchor: middle; font-family: var(--font-body); }
-.bar .val { fill: var(--ink); stroke: none; font-size: 12px; text-anchor: middle; font-family: var(--font-num); font-weight: 600; }
-.hint { text-align: center; font-size: 11px; color: var(--ink2); margin-top: 8px; }
+/* 棒グラフ：棒の高さは --h（0〜1）。高さが変わると、前の高さから伸び縮みする（左から少しずつ遅れて） */
+.bars { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 12px; height: 206px; padding: 24px 2px 0; animation: chart-in .45s var(--ease) both; }
+.bars.many { gap: 6px; }
+.bar { display: grid; grid-template-rows: 1fr auto; gap: 6px; min-width: 0; border-radius: 10px; }
+.bar .col { position: relative; display: flex; flex-direction: column; justify-content: flex-end; }
+.bar .fill { height: calc(var(--h, 0) * 100%); border-radius: 10px; background: var(--bar);
+  transition: height .7s var(--ease) calc(var(--i, 0) * 28ms), background-color .3s; }
+.bar.on .fill { background: var(--accent); }
+.bar:active .fill { filter: brightness(.94); }
+.bar .val { position: absolute; left: 50%; bottom: calc(var(--h, 0) * 100% + 6px); transform: translateX(-50%); white-space: nowrap;
+  font-family: var(--font-num); font-weight: 600; font-size: 12px; transition: bottom .7s var(--ease); animation: pop-in .4s var(--spring) both; }
+.bar:first-child .val { left: 0; transform: none; }
+.bar:last-child .val { left: auto; right: 0; transform: none; }
+.bar .lab { font-size: 11px; color: var(--ink2); text-align: center; white-space: nowrap; transition: color .3s; }
+.bars.many .lab { font-size: 10px; letter-spacing: -.02em; }
+.bar.on .lab { color: var(--ink); }
+/* 円グラフ：初めて出たときはぐるっと描かれ、期間を変えると割合が動く（stats.js の animatePie） */
+.pie-wrap { animation: chart-in .45s var(--ease) both; }
 .pie { display: grid; place-items: center; margin: 4px 0 10px; }
-.pie svg { width: 190px; height: 190px; }
-.arc { fill: none; stroke: currentColor; stroke-width: 26; stroke-linecap: butt; cursor: pointer; transition: opacity .2s; }
+.pie svg { width: 190px; height: 190px; overflow: visible; }
+.arc { fill: none; stroke: currentColor; stroke-width: 26; stroke-linecap: butt; cursor: pointer; transition: opacity .3s, stroke-width .35s var(--spring); }
 .arc.dim { opacity: .25; }
+.arc.on { stroke-width: 32; }
 .pie-empty { text-align: center; color: var(--ink2); font-size: 13px; padding: 40px 0; }
 .legend { display: grid; gap: 2px; }
-.legend-row { display: grid; grid-template-columns: 14px 1fr auto auto; gap: 10px; align-items: center; padding: 9px 6px; border-radius: 12px; text-align: left; }
+.legend-row { display: grid; grid-template-columns: 14px 1fr auto auto; gap: 10px; align-items: center; padding: 9px 6px; border-radius: 12px; text-align: left; animation: fade-in .4s var(--ease) both; }
 .legend-row.open { background: var(--soft); }
 .swatch { width: 12px; height: 12px; border-radius: 4px; background: currentColor; }
 .legend-row .pct { font-size: 12px; color: var(--ink2); }
 .legend-row .amt, .legend-cat .money { font-family: var(--font-num); font-weight: var(--num-weight); font-size: 16px; }
-.legend-cats { display: grid; padding: 2px 6px 8px 30px; }
+.legend-cats { display: grid; padding: 2px 6px 8px 30px; animation: fade-down .35s var(--ease) both; }
 .legend-cat { display: flex; justify-content: space-between; padding: 7px 8px; border-radius: 10px; font-size: 13px; }
 .legend-cat.on { background: var(--soft); }
-.chip.filter { font-size: 12px; padding: 6px 10px; }
+.chip.filter { font-size: 12px; padding: 6px 10px; animation: pop-in .4s var(--spring) both; }
+/* 一覧：新しく出てきた日・行だけ、ふわっと出る（同じものはそのまま） */
+.tx-list h3.date, .tx-list .list { animation: fade-in .4s var(--ease) both; }
 
 /* ---- シート ---- */
 .sheet-wrap { position: fixed; inset: 0; z-index: 20; }
-.sheet-dim { position: absolute; inset: 0; background: rgba(20,24,34,.38); opacity: 0; transition: opacity .2s; }
+.sheet-dim { position: absolute; inset: 0; background: rgba(20,24,34,.38); opacity: 0; transition: opacity .35s; }
 .sheet { position: absolute; left: 0; right: 0; bottom: 0; max-height: 88vh; overflow-y: auto; background: var(--card); color: var(--ink);
-  border-radius: 26px 26px 0 0; padding: 12px 20px calc(24px + env(safe-area-inset-bottom)); transform: translateY(100%); transition: transform .22s ease-out; }
+  border-radius: 26px 26px 0 0; padding: 12px 20px calc(24px + env(safe-area-inset-bottom)); transform: translateY(100%); transition: transform .5s var(--sheet); }
 .sheet-wrap.open .sheet-dim { opacity: 1; }
 .sheet-wrap.open .sheet { transform: none; }
-.sheet-bar { position: relative; height: 30px; margin-bottom: 8px; }
+.sheet-wrap.closing .sheet { transition-duration: .3s; transition-timing-function: cubic-bezier(.4, 0, 1, 1); }
+.sheet-wrap.closing .sheet-dim { transition-duration: .3s; }
+.sheet.dragging { transition: none; }
+.sheet-bar { position: relative; height: 30px; margin-bottom: 8px; touch-action: none; }
 .grab { position: absolute; left: 50%; top: 2px; transform: translateX(-50%); width: 40px; height: 4px; border-radius: 2px; background: var(--line); }
 .sheet-close { position: absolute; right: -6px; top: -2px; width: 34px; height: 34px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; color: var(--ink2); }
 .sheet-close svg { width: 16px; height: 16px; }
 /* 文字の欄の × （中身を消す） */
 .clear-wrap { position: relative; display: block; flex: 1; min-width: 0; }
 .clear-wrap input { width: 100%; padding-right: 40px !important; }
-.clear-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border-radius: 50%; background: var(--line); color: var(--ink2); display: none; place-items: center; }
+.clear-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border-radius: 50%; background: var(--line); color: var(--ink2);
+  display: grid; place-items: center; opacity: 0; scale: .5; pointer-events: none; transition: opacity .2s, scale .3s var(--spring); }
 .clear-btn svg { width: 12px; height: 12px; stroke-width: 2; }
-.clear-wrap.has-value .clear-btn { display: grid; }
+.clear-wrap.has-value .clear-btn { opacity: 1; scale: 1; pointer-events: auto; }
+.clear-wrap.has-value .clear-btn:active { scale: .85; }
 .sheet-title { font-family: var(--font-head); font-weight: 500; font-size: 20px; margin: 4px 0 4px; }
 .sheet-note { font-size: 12px; color: var(--ink2); margin: 0 0 14px; }
 .sheet-label { font-size: 12px; color: var(--ink2); margin: 18px 0 8px; letter-spacing: .1em; }
@@ -220,16 +262,20 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
 .picker-label { font-size: 11px; color: var(--ink2); margin-bottom: 6px; }
 .picker { display: flex; flex-wrap: wrap; gap: 8px; }
 .pick { padding: 9px 14px; border-radius: 14px; background: var(--soft); font-size: 13px; }
-.pick.on { background: var(--accent); color: var(--accent-ink); }
+.pick.on { background: var(--accent); color: var(--accent-ink); animation: pick-on .4s var(--spring); }
 .switch-row { display: flex; align-items: center; gap: 12px; margin: 18px 0 4px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 16px; cursor: pointer; }
 .page .switch-row { margin: 16px 20px; }
 .switch-row > span:first-child { flex: 1; font-size: 14px; }
 .switch-row small { display: block; font-size: 11px; color: var(--ink2); }
 .switch-row input { position: absolute; opacity: 0; pointer-events: none; }
 .switch { width: 44px; height: 26px; border-radius: 13px; background: var(--line); position: relative; transition: background .2s; flex-shrink: 0; }
-.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.switch { transition: background-color .3s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 10px; background: #fff; transition: transform .4s var(--spring), width .25s var(--ease); box-shadow: 0 1px 3px rgba(0,0,0,.2); }
 .switch-row input:checked + .switch { background: var(--accent); }
 .switch-row input:checked + .switch::after { transform: translateX(18px); }
+/* 押している間、つまみが少し横に伸びる（iPhone のスイッチと同じ） */
+.switch-row:active .switch::after { width: 25px; }
+.switch-row:active input:checked + .switch::after { transform: translateX(13px); }
 .switch-row input:focus-visible + .switch { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sheet-actions { display: grid; gap: 8px; margin-top: 18px; }
 .sheet-actions:empty { display: none; }
@@ -257,6 +303,8 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
 /* ---- 未分類の振り分け ---- */
 .progress { margin: 4px 24px 10px; font-size: 12px; color: var(--ink2); }
 .sort-card { margin: 0 20px; padding: 26px 22px; text-align: center; }
+.sort-card.advance { animation: card-next .5s var(--ease) both; }
+.row-edit { animation: fade-down .35s var(--ease) both; }
 .sort-merchant { font-size: 16px; font-weight: 500; word-break: break-all; }
 .sorter .picker-group { margin: 0 20px; }
 .sorter .picker-group + .picker-group { margin-top: 12px; }
@@ -265,31 +313,68 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
 .soon-card { margin: 20px; padding: 28px 22px; text-align: center; color: var(--ink2); font-size: 14px; }
 
 /* ---- タブバー ---- */
-.tabbar { position: fixed; z-index: 10; left: 0; right: 0; margin: 0 auto; bottom: var(--tab-bottom); width: min(448px, calc(100% - 24px));
-  height: 64px; border-radius: 26px; background: var(--tab-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  display: flex; justify-content: space-around; align-items: center; box-shadow: 0 6px 30px rgba(0,0,0,.08); }
+/* 4つのタブを同じ幅で並べ、選んでいるタブの後ろの丸い背景（.tab-pill）が、タブを替えるとすべって動く */
+.tabbar { --tab-i: 0; position: fixed; z-index: 10; left: 0; right: 0; margin: 0 auto; bottom: var(--tab-bottom); width: min(448px, calc(100% - 24px));
+  height: 68px; padding: 0 6px; border-radius: 30px; background: var(--tab-bg); backdrop-filter: blur(16px) saturate(1.3); -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  display: grid; grid-template-columns: repeat(4, 1fr); align-items: start; box-shadow: 0 8px 32px rgba(0,0,0,.10); transition: background-color .4s; }
 .tabbar[hidden] { display: none; }
-.tab { display: grid; justify-items: center; gap: 2px; font-size: 10px; color: var(--ink2); letter-spacing: .06em; padding: 6px 10px; }
-.tab svg { width: 22px; height: 22px; }
+.tab { position: relative; z-index: 1; height: 68px; display: grid; place-content: center; justify-items: center; gap: 3px; font-size: 11px; color: var(--ink2); letter-spacing: .06em; }
+.tab svg { width: 24px; height: 24px; }
 .tab.on { color: var(--accent); }
+.tab.on svg { animation: tab-pop .5s var(--spring); }
 .tab.side-only { display: none; }
+.tab-pill { position: absolute; left: 6px; top: 7px; width: calc((100% - 12px) / 4); height: 54px; pointer-events: none;
+  transform: translateX(calc(var(--tab-i) * 100%)); transition: transform .55s var(--spring), opacity .3s; }
+.tab-pill::before { content: ""; position: absolute; inset: 0 5px; border-radius: 22px; background: var(--soft); }
+.tabbar.no-pill .tab-pill { opacity: 0; }
+/* 四隅が丸い iPhone のホーム画面アプリ（app.js が round-screen を付ける）：バーを左右と下のふちまで広げて空きを --edge にそろえ、
+   下の角は画面の角と同じ中心で丸める（半径＝画面の角 − 空き）。アイコンの並びの高さは上と同じ（下から --tab-bottom） */
+.round-screen .tabbar { left: var(--edge); right: var(--edge); bottom: var(--edge); width: auto; margin: 0;
+  height: calc(var(--tab-bottom) - var(--edge) + 68px); padding-bottom: calc(var(--tab-bottom) - var(--edge));
+  border-radius: 34px 34px calc(var(--screen-r) - var(--edge)) calc(var(--screen-r) - var(--edge)); }
 
 /* ---- お知らせ・読み込み中 ---- */
-.toast { position: fixed; z-index: 30; left: 50%; bottom: calc(80px + var(--tab-bottom)); transform: translate(-50%, 12px); opacity: 0;
-  background: var(--ink); color: var(--bg); padding: 11px 18px; border-radius: 14px; font-size: 13px; transition: opacity .25s, transform .25s; max-width: calc(100% - 40px); }
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast { position: fixed; z-index: 30; left: 50%; bottom: calc(88px + var(--tab-bottom)); transform: translate(-50%, 14px) scale(.92); opacity: 0;
+  background: var(--ink); color: var(--bg); padding: 11px 18px; border-radius: 14px; font-size: 13px; transition: opacity .3s, transform .5s var(--spring); max-width: calc(100% - 40px); }
+.toast.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
 .toast.warn { background: var(--warn); color: #fff; }
 .loading { display: grid; place-items: center; gap: 14px; padding-top: 40vh; color: var(--ink2); font-size: 13px; }
 .spinner { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin 1s linear infinite; }
+.loading { animation: fade-in .4s .2s both; }
+
+/* ---- 画面に入ってくる動き（app.js の playEnter） ---- */
+/* タブどうし：上から順に少しずつ遅れて、下からふわっと。メニューなど奥の画面へは右から、戻るときは左から */
+.rise { animation: rise .6s var(--ease) both; animation-delay: calc(var(--d, 0) * 45ms); }
+.push-in { animation: in-from-right .45s var(--ease) both; }
+.pop-in { animation: in-from-left .45s var(--ease) both; }
+/* 金額を隠す／出すとき */
+.money-swap .money { animation: fade-in .35s var(--ease) both; }
+
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+@keyframes rise { from { opacity: 0; transform: translateY(16px); } }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes fade-down { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes in-from-right { from { opacity: 0; transform: translateX(28px); } }
+@keyframes in-from-left { from { opacity: 0; transform: translateX(-28px); } }
+@keyframes hero-in { from { opacity: .4; transform: scale(1.06); } }
+@keyframes tile-in { from { opacity: 0; transform: translateX(24px) scale(.96); } }
+@keyframes chart-in { from { opacity: 0; transform: scale(.97); } }
+@keyframes pop-in { from { opacity: 0; scale: .6; } }
+@keyframes pick-on { 0% { scale: .9; } 60% { scale: 1.06; } }
+@keyframes tab-pop { 0% { transform: scale(.8); } 55% { transform: scale(1.12); } 100% { transform: none; } }
+@keyframes card-next { from { opacity: 0; transform: translateX(40px) rotate(1.5deg); } }
+
+/* iPhone の「視差効果を減らす」がオンのときは動かさない */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 
 /* ---- PC（幅 900px 以上）：タブバー → 左の縦メニュー、ホームと統計は2列 ---- */
 @media (min-width: 900px) {
   #app { max-width: 1080px; margin-left: 220px; margin-right: auto; padding: 28px 32px 48px; }
-  .tabbar { left: 0; right: auto; margin: 0; top: 0; bottom: 0; width: 200px; height: auto; border-radius: 0; flex-direction: column; justify-content: flex-start;
+  .tabbar { left: 0; right: auto; margin: 0; top: 0; bottom: 0; width: 200px; height: auto; border-radius: 0; display: flex; flex-direction: column; justify-content: flex-start;
     align-items: stretch; gap: 4px; padding: 32px 14px; box-shadow: none; border-right: 1px solid var(--line); background: var(--bg); }
-  .tab { display: flex; gap: 12px; align-items: center; font-size: 14px; padding: 11px 14px; border-radius: 14px; }
+  .tab-pill { display: none; }
+  .tab { display: flex; gap: 12px; align-items: center; height: auto; font-size: 14px; padding: 11px 14px; border-radius: 14px; }
+  .tab svg { width: 22px; height: 22px; }
   .tab.on { background: var(--soft); }
   .tab.side-only { display: flex; margin-top: auto; }
   .home { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
@@ -297,7 +382,7 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
   .home-side .section:first-child { margin-top: 0; }
   .stats-body { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
   .stats-body .tx-list .section { margin-top: 0; }
-  .sheet { left: 50%; right: auto; bottom: 50%; width: 480px; border-radius: 26px; transform: translate(-50%, 60%); opacity: 0; transition: transform .22s, opacity .22s; }
+  .sheet { left: 50%; right: auto; bottom: 50%; width: 480px; border-radius: 26px; transform: translate(-50%, 60%); opacity: 0; transition: transform .4s var(--sheet), opacity .3s; }
   .sheet-wrap.open .sheet { transform: translate(-50%, 50%); opacity: 1; }
   .toast { bottom: 32px; }
 }

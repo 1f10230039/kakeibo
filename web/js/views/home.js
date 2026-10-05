@@ -1,10 +1,13 @@
 // S-01 ホーム。配置は docs/02_画面設計.md の S-01、見た目は docs/design/home_3案.html。
+// 切り替え（今週／今月・金額を隠す）や取り直しでは作り直さず、変わったところだけ書き換える（morphable）。ボタンの動きは .home にまとめて付ける。
 
 import * as C from '../calc.js';
 import { CATEGORY_PHOTO, categoryIcon } from '../icons.js';
-import { esc, money, iconMark, icon } from '../ui.js';
+import { esc, money, iconMark, icon, seg } from '../ui.js';
 
 let topRange = 'week'; // 支出トップの期間：'week'（今週）／'month'（今月）
+
+export const morphable = true;
 
 export function render(ctx) {
   const { data, today, look, hidden } = ctx;
@@ -28,6 +31,7 @@ export function render(ctx) {
   <div class="home">
     <div class="home-main">
       <div class="hero">
+        <div class="hero-img"></div>
         <div class="top">
           <div><div class="month">${today.getMonth() + 1}月</div><div class="greet${look.greeting.length >= 9 ? ' long' : ''}">${esc(look.greeting)}</div></div>
           <div class="icons">
@@ -39,7 +43,7 @@ export function render(ctx) {
 
       <section class="spend card">
         <div class="label">今月の支出</div>
-        <div class="big">${money(thisMonth, hidden)}</div>
+        <div class="big">${money(thisMonth, hidden, 'month')}</div>
         <div class="compare">先月の同じ日まで ${money(lastMonth, hidden)}　<b>${hidden ? '' : diff === 0 ? '同じ' : esc(C.yen(Math.abs(diff)).slice(1)) + (diff < 0 ? '円 少ない' : '円 多い')}</b></div>
       </section>
 
@@ -60,13 +64,10 @@ export function render(ctx) {
 
     <div class="home-side">
       <div class="section"><h2>支出トップ</h2>
-        <div class="seg" role="group" aria-label="期間">
-          <button class="${topRange === 'week' ? 'on' : ''}" data-range="week">今週</button>
-          <button class="${topRange === 'month' ? 'on' : ''}" data-range="month">今月</button>
-        </div>
+        ${seg('range', [['week', '今週'], ['month', '今月']], topRange, '期間')}
       </div>
       ${top.length ? `<div class="tiles">${top.slice(0, 5).map((c, i) => `
-        <a class="tile ${CATEGORY_PHOTO[c.name] ? 'photo-' + CATEGORY_PHOTO[c.name] : 'tile-plain'}" href="#/stats?cat=${encodeURIComponent(c.name)}&unit=${topRange}">
+        <a class="tile ${CATEGORY_PHOTO[c.name] ? 'photo-' + CATEGORY_PHOTO[c.name] : 'tile-plain'}" data-key="${topRange}:${esc(c.name)}" data-vars="--i:${i}" href="#/stats?cat=${encodeURIComponent(c.name)}&unit=${topRange}">
           <span class="rank">${i + 1}</span>${CATEGORY_PHOTO[c.name] ? '' : `<span class="plain-icon">${categoryIcon('未分類')}</span>`}
           <div class="cap"><div class="cat">${esc(c.name)}</div><div class="amt">${money(c.total, hidden)}</div></div>
         </a>`).join('')}</div>` : `<p class="empty">${topRange === 'week' ? '今週' : '今月'}の支出はまだありません</p>`}
@@ -79,7 +80,7 @@ export function render(ctx) {
 
 export function row(t, group, hidden, sub = '') {
   const d = C.parseYmd(t.date);
-  return `<button class="row" data-tx="${esc(t.id)}">
+  return `<button class="row" data-key="${esc(t.id)}" data-tx="${esc(t.id)}">
     ${iconMark(t.category, group)}
     <span class="t"><b><span class="cat-name">${esc(t.category || '未分類')}</span>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</b><small>${d.getMonth() + 1}/${d.getDate()}${t.status === '速報' ? '<span class="badge">速報</span>' : ''}${t.source === '手入力' ? '<span class="badge">手入力</span>' : ''}</small></span>
     <span class="a">${money(t.amount, hidden)}</span>
@@ -87,8 +88,17 @@ export function row(t, group, hidden, sub = '') {
 }
 
 export function mount(root, ctx) {
-  root.querySelector('[data-act="hide"]').addEventListener('click', ctx.toggleHidden);
-  root.querySelector('[data-act="manual"]').addEventListener('click', ctx.openManual);
-  root.querySelectorAll('[data-range]').forEach(b => b.addEventListener('click', () => { topRange = b.dataset.range; ctx.rerender(); }));
-  root.querySelectorAll('[data-tx]').forEach(b => b.addEventListener('click', () => ctx.openDetail(b.dataset.tx)));
+  const page = root.firstElementChild;
+  page.addEventListener('click', e => {
+    const el = e.target.closest('[data-act], [data-range], [data-tx]');
+    if (!el) return;
+    const d = el.dataset;
+    if (d.act === 'hide') ctx.toggleHidden();
+    else if (d.act === 'manual') ctx.openManual();
+    else if (d.range && d.range !== topRange) {
+      topRange = d.range;
+      ctx.rerender();
+      page.querySelector('.tiles')?.scrollTo({ left: 0, behavior: 'smooth' });
+    } else if (d.tx) ctx.openDetail(d.tx);
+  });
 }
