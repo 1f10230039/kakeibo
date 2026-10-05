@@ -38,7 +38,7 @@ export function openDetail(ctx, id) {
     <div class="sheet-label">カテゴリ</div>
     ${categoryPicker(ctx.data.categories, t.category)}
     <div class="sheet-label">名前（一覧で用途の横に出ます。なくてもよい）</div>
-    <div class="name-row"><input id="name" maxlength="100" autocomplete="off" placeholder="例：YouTube Premium" value="${esc(t.memo || ruleName)}">
+    <div class="name-row"><input id="name" data-clear maxlength="100" autocomplete="off" placeholder="例：YouTube Premium" value="${esc(t.memo || ruleName)}">
       <button class="btn small" data-act="name">保存</button></div>
     <div class="sheet-actions">
       ${t.source === '手入力' ? '<button class="btn danger" data-act="delete">この記録を消す</button>' : ''}
@@ -98,7 +98,7 @@ export function openManual(ctx) {
     <label class="amount-input"><span>¥</span><input id="amount" inputmode="numeric" pattern="[0-9]*" placeholder="0" autocomplete="off" aria-label="金額"></label>
     <div class="field-row">
       <label class="field"><span>日付</span><input id="date" type="date" value="${C.ymd(ctx.today)}" max="${C.ymd(ctx.today)}"></label>
-      <label class="field grow"><span>名前（なくてもよい）</span><input id="memo" maxlength="100" autocomplete="off" placeholder="例：コンビニ"></label>
+      <label class="field grow"><span>名前（なくてもよい）</span><input id="memo" data-clear maxlength="100" autocomplete="off" placeholder="例：コンビニ"></label>
     </div>
     <div class="sheet-label">カテゴリ（あとで決めてもよい）</div>
     ${categoryPicker(ctx.data.categories, '')}

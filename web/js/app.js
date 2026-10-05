@@ -3,7 +3,7 @@
 
 import * as api from './api.js';
 import { lookOf } from './theme.js';
-import { toast, closeSheet, icon } from './ui.js';
+import { toast, closeSheet, icon, addClearButtons } from './ui.js';
 import * as home from './views/home.js';
 import * as stats from './views/stats.js';
 import { openDetail, openManual } from './views/sheets.js';
@@ -71,6 +71,7 @@ function render() {
     return;
   }
   root.innerHTML = view.render(ctx);
+  addClearButtons(root);
   view.mount(root, ctx);
 }
 

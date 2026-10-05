@@ -29,7 +29,8 @@ export function openSheet(innerHtml, onMount) {
   closeSheet();
   const wrap = document.createElement('div');
   wrap.className = 'sheet-wrap';
-  wrap.innerHTML = `<div class="sheet-dim"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${innerHtml}</div>`;
+  wrap.innerHTML = `<div class="sheet-dim"></div><div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-bar"><span class="grab"></span><button class="sheet-close" aria-label="閉じる">${UI_ICON.close}</button></div>${innerHtml}</div>`;
   document.body.appendChild(wrap);
   requestAnimationFrame(() => wrap.classList.add('open'));
   const close = () => {
@@ -41,12 +42,35 @@ export function openSheet(innerHtml, onMount) {
   const onKey = e => { if (e.key === 'Escape') close(); };
   document.addEventListener('keydown', onKey);
   wrap.querySelector('.sheet-dim').addEventListener('click', close);
+  wrap.querySelector('.sheet-close').addEventListener('click', close);
   sheetCloser = close;
+  addClearButtons(wrap);
   onMount(wrap.querySelector('.sheet'), close);
 }
 
 export function closeSheet() {
   if (sheetCloser) sheetCloser();
+}
+
+/** data-clear の付いた文字の欄に、中身を消す × を付ける。 */
+export function addClearButtons(root) {
+  root.querySelectorAll('input[data-clear]').forEach(input => {
+    if (input.parentElement.classList.contains('clear-wrap')) return;
+    const wrap = document.createElement('span');
+    wrap.className = 'clear-wrap';
+    input.replaceWith(wrap);
+    wrap.appendChild(input);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'clear-btn';
+    btn.setAttribute('aria-label', '消す');
+    btn.innerHTML = UI_ICON.close;
+    wrap.appendChild(btn);
+    const sync = () => wrap.classList.toggle('has-value', input.value !== '');
+    input.addEventListener('input', sync);
+    btn.addEventListener('click', () => { input.value = ''; sync(); input.focus(); });
+    sync();
+  });
 }
 
 // ---- お知らせ（画面の下に少し出る） ----

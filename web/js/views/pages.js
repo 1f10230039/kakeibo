@@ -60,7 +60,7 @@ export const unclassified = {
         <div class="compare">${esc(C.mdw(C.parseYmd(t.date)))}・${esc(t.status)}</div>
       </section>
       ${t.merchant ? `<label class="switch-row"><span>この店はいつもこの内容<small>次からはカテゴリと名前を自動で付けます</small></span><input type="checkbox" id="always" checked><span class="switch" aria-hidden="true"></span></label>` : ''}
-      <label class="field"><span>名前（一覧で用途の横に出ます。なくてもよい）</span><input id="name" maxlength="100" autocomplete="off" placeholder="例：YouTube Premium" value="${esc(t.memo)}"></label>
+      <label class="field"><span>名前（一覧で用途の横に出ます。なくてもよい）</span><input id="name" data-clear maxlength="100" autocomplete="off" placeholder="例：YouTube Premium" value="${esc(t.memo)}"></label>
       ${categoryPicker(ctx.data.categories, '')}
       <button class="btn ghost wide" data-act="skip">あとで決める</button>
     </div>`;
@@ -149,7 +149,7 @@ export const rules = {
       ${list.length ? `<div class="list card">${list.map(r => `
         <button class="row link" data-merchant="${esc(r.merchant)}"><span class="t"><b>${esc(r.merchant)}</b><small>${esc(r.category)}${r.displayName ? '・' + esc(r.displayName) : ''}</small></span>${icon('chevron')}</button>
         ${editing === r.merchant ? `<div class="row-edit">
-          <label class="field"><span>名前（一覧で用途の横に出ます）</span><input id="rule-name" maxlength="100" autocomplete="off" placeholder="例：YouTube Premium" value="${esc(r.displayName)}"></label>
+          <label class="field"><span>名前（一覧で用途の横に出ます）</span><input id="rule-name" data-clear maxlength="100" autocomplete="off" placeholder="例：YouTube Premium" value="${esc(r.displayName)}"></label>
           ${categoryPicker(ctx.data.categories, r.category)}
           <button class="btn primary wide" data-act="save-rule" data-category="${esc(r.category)}">保存</button>
         </div>` : ''}`).join('')}</div>`
