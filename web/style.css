@@ -1,7 +1,8 @@
 /* 家計簿の見た目。色と文字は時間帯で3つのテーマを切り替える（js/theme.js）。
    A 朝の光（朝・夕方）／B 森と余白（昼）／C 夜の静けさ（夜）。docs/design/home_3案.html と同じ値。 */
 
-:root { --tab-bottom: max(8px, calc(env(safe-area-inset-bottom) - 22px)); }
+/* タブバーの下の空き。iPhone（下の余白 34px）では下から 40px＝ホームバーのすぐ上。余白のない画面では 8px */
+:root { --tab-bottom: max(8px, calc(env(safe-area-inset-bottom) + 6px)); }
 :root, [data-theme="a"] {
   --bg: #f6f2ec; --card: #fffdf9; --ink: #1f2a44; --ink2: #6b6f7a; --line: #e7e0d6;
   --accent: #1f2a44; --accent-ink: #fffdf9; --soft: #efe8dd; --bar: #d9cfc1;
