@@ -41,7 +41,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .money, .big, .num, .amt, .a, .rank, .val { font-variant-numeric: lining-nums; }
 
-#app { max-width: 480px; margin: 0 auto; padding-bottom: calc(84px + var(--tab-bottom)); }
+/* どの画面でも、中身の高さを最低でも画面いっぱいにする。
+   iPhone のホーム画面アプリでは、ページが画面より短いと、下に固定したタブバーが上にずれることがあるため（10/6 本人の iPhone で発生） */
+html, body { min-height: 100%; }
+body { min-height: 100vh; min-height: 100dvh; }
+#app { max-width: 480px; margin: 0 auto; padding-bottom: calc(84px + var(--tab-bottom)); min-height: 100vh; min-height: 100dvh; }
 .card { background: var(--card); border-radius: 24px; }
 .label { font-size: 12px; letter-spacing: .14em; color: var(--ink2); }
 .empty { color: var(--ink2); font-size: 13px; margin: 8px 20px 0; }

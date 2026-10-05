@@ -2,7 +2,7 @@
 // データ（API）はここでは扱わない。最後に取れたデータは app.js が端末の保存場所に置いている。
 // 画面のファイルを直したら VERSION を上げる（古い保存を消して、新しいものを取り直すため）。
 
-const VERSION = 'kakeibo-v2';
+const VERSION = 'kakeibo-v3';
 const SHELL = [
   './', 'index.html', 'style.css', 'manifest.webmanifest',
   'js/app.js', 'js/api.js', 'js/calc.js', 'js/theme.js', 'js/icons.js', 'js/ui.js',
