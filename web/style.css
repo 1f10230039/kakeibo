@@ -5,7 +5,7 @@
 :root { --tab-bottom: calc(env(safe-area-inset-bottom) + 14px);
   /* 画面の角の丸み。iPhone 16 は 55pt（ScreenCorners の一覧。CSS からは読めないので数字で持つ）。
      --edge はタブバーと画面のふちの空き（左右と下でそろえる） */
-  --screen-r: 55px; --edge: 10px;
+  --screen-r: 55px; --edge: 24px;
   /* 動きの速さの変わり方：--ease すっと止まる／--spring 少しだけ行きすぎて戻る／--sheet iPhone のシートに近い */
   --ease: cubic-bezier(.22, 1, .36, 1); --spring: cubic-bezier(.34, 1.45, .64, 1); --sheet: cubic-bezier(.32, .72, 0, 1); }
 :root, [data-theme="a"] {
