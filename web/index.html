@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ja" data-theme="a">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- 読み込んでよい先を絞る：API は Google Apps Script だけ、文字は Google Fonts だけ、それ以外はこのサイトの中 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://script.google.com https://script.googleusercontent.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#f6f2ec">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="家計簿">
+<title>家計簿</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="images/icon-192.png">
+<link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&family=Cormorant+Garamond:wght@500;600&family=Zen+Kaku+Gothic+New:wght@300;400;500;700&family=Jost:wght@300;400;500&family=Zen+Old+Mincho:wght@500;600&family=Bodoni+Moda:opsz,wght@6..96,500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav id="tabbar" class="tabbar" aria-label="画面の切り替え"></nav>
+  <main id="app"></main>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

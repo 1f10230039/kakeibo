@@ -1,0 +1,164 @@
+// ホーム・統計以外の画面：S-00 合言葉、S-06 未分類の振り分け、確認が必要な速報、S-08 メニュー、S-10 対応表、
+// 予算・資産（準備中）。
+
+import * as C from '../calc.js';
+import * as api from '../api.js';
+import { esc, money, icon, toast } from '../ui.js';
+import { categoryPicker, openDetail } from './sheets.js';
+import { row } from './home.js';
+
+const backBar = (title, href = '#/home') => `<header class="page-head with-back"><a class="back" href="${href}" aria-label="戻る">${icon('back')}</a><h1>${esc(title)}</h1></header>`;
+
+// ---- S-00 合言葉 ----
+
+export const key = {
+  render: () => `
+  <div class="page key">
+    <header class="page-head"><h1>はじめに</h1></header>
+    <p class="lead">「家計簿 API」の URL と合言葉を入れてください。この端末の中にだけ保存されます。</p>
+    <label class="field"><span>API の URL</span><input id="url" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec"></label>
+    <label class="field"><span>合言葉（64文字）</span><input id="secret" type="password" autocomplete="off" spellcheck="false"></label>
+    <button class="btn primary wide" data-act="save">確かめて保存する</button>
+    <p class="note">⚠️ 合言葉は1時間に10回間違えると、その1時間は正しくても入れなくなります。コピーして貼り付けてください。</p>
+  </div>`,
+  mount(root, ctx) {
+    const btn = root.querySelector('[data-act="save"]');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true; btn.textContent = '確かめています…';
+      try {
+        await api.setCredentials(root.querySelector('#url').value, root.querySelector('#secret').value);
+        toast('つながりました');
+        await ctx.refresh();
+        location.hash = '#/home';
+      } catch (e) {
+        toast(e.message, 'warn');
+      } finally {
+        btn.disabled = false; btn.textContent = '確かめて保存する';
+      }
+    });
+  },
+};
+
+// ---- S-06 未分類の振り分け ----
+
+let skipped = new Set();
+
+export const unclassified = {
+  render(ctx) {
+    const items = C.newestFirst(C.unclassified(ctx.data.transactions)).filter(t => !skipped.has(t.id));
+    if (!items.length) {
+      skipped = new Set();
+      return `<div class="page">${backBar('未分類の振り分け')}<p class="empty big">振り分けを待っている利用はありません 🎉</p></div>`;
+    }
+    const t = items[0];
+    return `<div class="page sorter">
+      ${backBar('未分類の振り分け')}
+      <p class="progress">残り ${items.length} 件</p>
+      <section class="sort-card card">
+        <div class="sort-merchant">${esc(t.merchant || (t.source === '手入力' ? '手入力' + (t.memo ? '：' + t.memo : '') : '（店名なし）'))}</div>
+        <div class="big">${money(t.amount, ctx.hidden)}</div>
+        <div class="compare">${esc(C.mdw(C.parseYmd(t.date)))}・${esc(t.status)}</div>
+      </section>
+      ${t.merchant ? `<label class="switch-row"><span>この店はいつもこのカテゴリ<small>次からは自動で振り分けます</small></span><input type="checkbox" id="always" checked><span class="switch" aria-hidden="true"></span></label>` : ''}
+      ${categoryPicker(ctx.data.categories, '')}
+      <button class="btn ghost wide" data-act="skip">あとで決める</button>
+    </div>`;
+  },
+  mount(root, ctx) {
+    const items = C.newestFirst(C.unclassified(ctx.data.transactions)).filter(t => !skipped.has(t.id));
+    const t = items[0];
+    if (!t) return;
+    root.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', async () => {
+      const always = root.querySelector('#always')?.checked;
+      const cat = b.dataset.pick;
+      await ctx.write(always ? api.setRule(t.merchant, cat) : api.setCategory(t.id, cat), always ? `「${t.merchant}」をいつも${cat}にしました` : `${cat}にしました`);
+    }));
+    root.querySelector('[data-act="skip"]').addEventListener('click', () => { skipped.add(t.id); ctx.rerender(); });
+  },
+};
+
+// ---- 確認が必要な速報（14日たっても確定にならない） ----
+
+export const stale = {
+  render(ctx) {
+    const items = C.newestFirst(C.staleSokuho(ctx.data.transactions, ctx.today));
+    return `<div class="page">${backBar('確認が必要な速報')}
+      <p class="lead">速報のメールが来てから14日たっても、確定のメールが来ていない利用です。キャンセルになったか、確定で金額が変わった可能性があります。タップして、キャンセルだったものは取り消してください。</p>
+      ${items.length ? `<div class="list card">${items.map(t => row(t, '未分類', ctx.hidden)).join('')}</div>` : '<p class="empty">ありません</p>'}
+    </div>`;
+  },
+  mount(root, ctx) {
+    root.querySelectorAll('[data-tx]').forEach(b => b.addEventListener('click', () => openDetail(ctx, b.dataset.tx)));
+  },
+};
+
+// ---- S-08 メニュー ----
+
+export const menu = {
+  render(ctx) {
+    const s = ctx.data.settings;
+    return `<div class="page menu">
+      ${backBar('メニュー')}
+      <div class="menu-group-label">設定</div>
+      <div class="list card">
+        <a class="row link" href="#/rules"><span class="t"><b>カテゴリの対応表</b><small>店 → カテゴリ（${ctx.data.rules.length}件）</small></span>${icon('chevron')}</a>
+        <div class="row"><span class="t"><b>週の始まり</b><small>統計の「週」と、ホームの「今週」</small></span>
+          <div class="seg"><button class="${s.weekStart === '月' ? 'on' : ''}" data-week="月">月曜</button><button class="${s.weekStart === '日' ? 'on' : ''}" data-week="日">日曜</button></div></div>
+        <div class="row"><span class="t"><b>予算の設定</b><small>段階②で作ります</small></span></div>
+        <div class="row"><span class="t"><b>CSV の取り込みと照合</b><small>e-NAVI の CSV の形がわかってから作ります</small></span></div>
+      </div>
+      <div class="menu-group-label">状態</div>
+      <div class="list card">
+        <div class="row"><span class="t"><b>最終取り込み</b><small>${esc(s.lastIngest || 'まだ')}</small></span></div>
+        <div class="row"><span class="t"><b>データを取った時刻</b><small>${ctx.fetchedAt ? esc(new Date(ctx.fetchedAt).toLocaleString('ja-JP')) : '—'}</small></span><button class="btn small" data-act="refresh">取り直す</button></div>
+        ${s.unreadableMails ? `<div class="row"><span class="t"><b>読めなかったメール</b><small>${s.unreadableMails}通。取り込みの Apps Script の「記録」シートを確認する</small></span></div>` : ''}
+      </div>
+      <div class="menu-group-label">この端末</div>
+      <div class="list card">
+        <button class="row link" data-act="forget"><span class="t"><b>URL と合言葉を入れ直す</b><small>この端末に保存したものを消します</small></span>${icon('chevron')}</button>
+      </div>
+      <p class="credit">写真：Unsplash（Unsplash License）。一覧は images/CREDITS.md</p>
+    </div>`;
+  },
+  mount(root, ctx) {
+    root.querySelectorAll('[data-week]').forEach(b => b.addEventListener('click', () => ctx.write(api.setSetting('週の始まり', b.dataset.week), `週の始まりを${b.dataset.week}曜にしました`)));
+    root.querySelector('[data-act="refresh"]').addEventListener('click', () => ctx.refresh(true));
+    root.querySelector('[data-act="forget"]').addEventListener('click', () => {
+      if (!confirm('この端末に保存した URL と合言葉を消しますか？')) return;
+      api.forgetCredentials();
+      location.hash = '#/key';
+    });
+  },
+};
+
+// ---- S-10 対応表 ----
+
+let editing = null;
+
+export const rules = {
+  render(ctx) {
+    const list = [...ctx.data.rules].sort((a, b) => a.merchant.localeCompare(b.merchant));
+    return `<div class="page">${backBar('カテゴリの対応表', '#/menu')}
+      <p class="lead">確定のメールの店名が、ここにあるカテゴリに自動で振り分けられます。タップすると変えられます。</p>
+      ${list.length ? `<div class="list card">${list.map(r => `
+        <button class="row link" data-merchant="${esc(r.merchant)}"><span class="t"><b>${esc(r.merchant)}</b><small>${esc(r.category)}</small></span>${icon('chevron')}</button>
+        ${editing === r.merchant ? `<div class="row-edit">${categoryPicker(ctx.data.categories, r.category)}</div>` : ''}`).join('')}</div>`
+        : '<p class="empty">まだありません。利用の詳細で「この店はいつもこのカテゴリ」をオンにすると増えます。</p>'}
+    </div>`;
+  },
+  mount(root, ctx) {
+    root.querySelectorAll('[data-merchant]').forEach(b => b.addEventListener('click', () => { editing = editing === b.dataset.merchant ? null : b.dataset.merchant; ctx.rerender(); }));
+    root.querySelectorAll('.row-edit [data-pick]').forEach(b => b.addEventListener('click', async () => {
+      const m = editing; editing = null;
+      await ctx.write(api.setRule(m, b.dataset.pick), `「${m}」を${b.dataset.pick}にしました`);
+    }));
+  },
+};
+
+// ---- 予算・資産（準備中） ----
+
+export const soon = (title, stage) => ({
+  render: () => `<div class="page soon-page"><header class="page-head"><h1>${esc(title)}</h1></header>
+    <div class="soon-card card"><p>${esc(title)}の画面は段階${stage}で作ります。</p></div></div>`,
+  mount() {},
+});

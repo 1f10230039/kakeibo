@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>家計簿 ワイヤーフレーム</title>
+<style>
+  :root { --bg:#f4f4f2; --frame:#ffffff; --line:#c9c9c4; --box:#e3e3df; --box2:#d2d2cd; --ink:#55554f; --ink2:#8a8a84; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif; font-size:12px; }
+  header.page { padding:24px 16px 8px; max-width:1400px; margin:0 auto; }
+  header.page h1 { font-size:20px; margin:0 0 4px; font-weight:600; }
+  header.page p { margin:0; color:var(--ink2); line-height:1.7; }
+  .grid { display:flex; flex-wrap:wrap; gap:32px 24px; padding:16px; max-width:1400px; margin:0 auto; }
+  figure { margin:0; }
+  figcaption { font-size:13px; font-weight:600; margin-bottom:8px; }
+  figcaption span { font-weight:400; color:var(--ink2); margin-left:6px; }
+  .phone { width:300px; min-height:650px; background:var(--frame); border:1px solid var(--line); border-radius:32px; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+  .scroll { flex:1; overflow:hidden; padding:0 0 8px; display:flex; flex-direction:column; gap:10px; }
+  .scroll > * { flex-shrink:0; }
+  .hscroll { padding-bottom:2px; }
+  .pad { padding:0 16px; }
+  .box { background:var(--box); border-radius:14px; display:flex; align-items:center; justify-content:center; text-align:center; color:var(--ink); padding:6px; line-height:1.4; }
+  .box.dark { background:var(--box2); }
+  .box.line { background:transparent; border:1px dashed var(--line); }
+  .photo { background:repeating-linear-gradient(135deg,#dcdcd7 0 10px,#e6e6e2 10px 20px); }
+  .row { display:flex; gap:8px; }
+  .row > * { flex:1; }
+  .h { height:var(--h); }
+  .label { font-size:11px; color:var(--ink2); padding:0 16px; }
+  .big { font-size:22px; font-weight:700; letter-spacing:.02em; }
+  .tabbar { height:64px; border-top:1px solid var(--line); display:flex; align-items:center; justify-content:space-around; padding:0 8px; background:#fff; }
+  .tab { width:44px; text-align:center; font-size:10px; color:var(--ink2); }
+  .tab i { display:block; width:22px; height:22px; margin:0 auto 3px; border-radius:6px; background:var(--box2); }
+  .tab.on { color:var(--ink); font-weight:700; }
+  .tab.on i { background:#9a9a94; }
+  .plus { width:50px; height:50px; border-radius:50%; background:#9a9a94; color:#fff; font-size:24px; display:flex; align-items:center; justify-content:center; margin-top:-22px; }
+  .hscroll { display:flex; gap:8px; overflow:hidden; padding-left:16px; }
+  .hscroll .box { flex:0 0 110px; height:120px; flex-direction:column; }
+  .chip { display:inline-block; padding:3px 10px; border-radius:20px; background:var(--box); margin-right:4px; }
+  .chip.on { background:var(--box2); font-weight:700; }
+  .list .item { display:flex; align-items:center; gap:10px; padding:8px 16px; border-bottom:1px solid #eeeeea; }
+  .list .dot { width:28px; height:28px; border-radius:9px; background:var(--box); flex:0 0 28px; }
+  .list .t { flex:1; } .list .t small { display:block; color:var(--ink2); font-size:10px; }
+  .dim { position:absolute; inset:0; background:rgba(60,60,55,.35); }
+  .sheet { position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:22px 22px 0 0; padding:14px 16px 20px; display:flex; flex-direction:column; gap:10px; }
+  .grab { width:40px; height:4px; border-radius:2px; background:var(--line); margin:0 auto 4px; }
+  .dots { text-align:center; } .dots b { display:inline-block; width:6px; height:6px; border-radius:3px; background:var(--line); margin:0 2px; } .dots b.on { width:14px; background:#9a9a94; }
+  .topbar { height:44px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; }
+  .ico { width:22px; height:22px; border-radius:6px; background:var(--box2); }
+  .pc { width:980px; max-width:calc(100vw - 32px); height:600px; background:#fff; border:1px solid var(--line); border-radius:12px; display:flex; overflow:hidden; }
+  .side { width:170px; border-right:1px solid var(--line); padding:20px 12px; display:flex; flex-direction:column; gap:10px; }
+  .side .tab { width:auto; text-align:left; display:flex; align-items:center; gap:8px; font-size:12px; }
+  .side .tab i { margin:0; }
+  .pcmain { flex:1; display:flex; gap:20px; padding:20px; }
+  .pcmain > div { flex:1; display:flex; flex-direction:column; gap:12px; }
+  .note { font-size:10px; color:var(--ink2); }
+  svg text { font-family:inherit; }
+  .flow { width:100%; max-width:1100px; background:#fff; border:1px solid var(--line); border-radius:12px; }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>家計簿 ワイヤーフレーム（第2稿・2026-10-06）</h1>
+  <p>灰色の箱だけで配置を見るための図。色・写真・文字の雰囲気はまだ入れていない。斜線の箱＝写真を置く場所。<br>説明は <code>02_画面設計.md</code>。</p>
+</header>
+
+<div class="grid">
+
+  <!-- S-01 ホーム -->
+  <figure>
+    <figcaption>S-01 ホーム<span>段階①</span></figcaption>
+    <div class="phone">
+      <div class="scroll">
+        <div class="photo" style="height:200px;position:relative;">
+          <div class="topbar" style="position:absolute;inset:0 0 auto 0;"><span>10月・こんばんは</span><span class="row" style="gap:10px;flex:0"><span class="ico" title="金額を隠す"></span><span class="ico" title="メニュー"></span></span></div>
+          <div style="position:absolute;bottom:8px;left:16px;color:var(--ink2)">写真（季節・月で変わる）</div>
+        </div>
+        <div class="pad" style="margin-top:-36px;position:relative;z-index:1;">
+          <div class="box dark" style="height:96px;flex-direction:column;">今月の支出<span class="big">¥ 00,000</span><span class="note">先月の同じ日まで ¥00,000</span></div>
+        </div>
+        <div class="pad row"><div class="box" style="height:52px">収入<br>—</div><div class="box" style="height:52px">残高<br>—</div></div>
+        <div class="pad"><div class="box line" style="height:32px">10/27 引き落とし予定 ¥00,000</div></div>
+        <div class="label">やること（あるときだけ）</div><div class="pad row"><div class="box line" style="height:34px;flex:2">未分類が3件 ›</div><div class="box line" style="height:34px;flex:2">CSV で照合 ›</div><div class="box dark" style="height:34px;flex:1.4">記録する</div></div>
+        <div class="label">支出トップ　<span class="chip on">今週</span><span class="chip">今月</span></div>
+        <div class="hscroll">
+          <div class="box photo">1<br>食費<br>¥0,000</div><div class="box photo">2<br>趣味<br>¥0,000</div><div class="box photo">3<br>…</div>
+        </div>
+        <div class="label">最近の利用</div>
+        <div class="list"><div class="item"><span class="dot"></span><span class="t"><b style="font-size:13px">食費</b><small>10/05・速報</small></span>¥0,000</div></div>
+      </div>
+      <div class="tabbar"><div class="tab on"><i></i>ホーム</div><div class="tab"><i></i>統計</div><div class="tab"><i></i>予算</div><div class="tab"><i></i>資産</div></div>
+    </div>
+  </figure>
+
+  <!-- S-02 統計（棒） -->
+  <figure>
+    <figcaption>S-02 統計<span>棒グラフ</span></figcaption>
+    <div class="phone">
+      <div class="scroll">
+        <div class="topbar"><b style="font-size:16px">統計</b></div>
+        <div class="pad row" style="align-items:center"><span style="flex:0 0 auto"><span class="chip">週</span><span class="chip on">月</span><span class="chip">年</span></span><span style="text-align:right"><span class="chip on">棒</span><span class="chip">円</span></span></div>
+        <div class="pad" style="text-align:center;font-weight:600">‹　2026年10月　›</div>
+        <div class="pad"><div class="box" style="height:200px;flex-direction:column;justify-content:flex-end;gap:6px;">
+          <div class="row" style="align-items:flex-end;height:140px;width:100%;gap:10px;padding:0 10px;">
+            <div class="box dark" style="height:40%"></div><div class="box dark" style="height:70%"></div><div class="box dark" style="height:55%"></div><div class="box" style="height:85%;background:#9a9a94;color:#fff;font-size:10px;align-items:flex-start">¥0</div>
+          </div>
+          <div class="row note" style="width:100%;padding:0 10px">週1　週2　週3　週4</div>
+        </div></div>
+        <div class="note" style="text-align:center">← 左右にスワイプで前後の月へ →</div>
+        <div class="label">利用一覧　<span class="chip">第4週で絞り込み中 ×</span></div>
+        <div class="list">
+          <div class="label" style="padding:4px 16px">10/05（日）</div>
+          <div class="item"><span class="dot"></span><span class="t"><b style="font-size:13px">食費</b></span>¥0,000</div>
+          <div class="item"><span class="dot"></span><span class="t"><b style="font-size:13px">交通費</b></span>¥0,000</div>
+          <div class="label" style="padding:4px 16px">10/04（土）</div>
+          <div class="item"><span class="dot"></span><span class="t"><b style="font-size:13px">サブスク</b></span>¥0,000</div>
+        </div>
+      </div>
+      <div class="tabbar"><div class="tab"><i></i>ホーム</div><div class="tab on"><i></i>統計</div><div class="tab"><i></i>予算</div><div class="tab"><i></i>資産</div></div>
+    </div>
+  </figure>
+
+  <!-- S-02 統計（円） -->
+  <figure>
+    <figcaption>S-02 統計<span>円グラフ（切り替えボタン）</span></figcaption>
+    <div class="phone">
+      <div class="scroll">
+        <div class="topbar"><b style="font-size:16px">統計</b></div>
+        <div class="pad row" style="align-items:center"><span style="flex:0 0 auto"><span class="chip">週</span><span class="chip on">月</span><span class="chip">年</span></span><span style="text-align:right"><span class="chip">棒</span><span class="chip on">円</span></span></div>
+        <div class="pad" style="text-align:center;font-weight:600">‹　2026年10月　›</div>
+        <div class="pad"><div class="box" style="height:200px;gap:14px;">
+          <div style="width:120px;height:120px;border-radius:50%;background:conic-gradient(#b5b5af 0 40%,#cfcfca 40% 62%,#9a9a94 62% 90%,#e0e0dc 90%);display:flex;align-items:center;justify-content:center;"><div style="width:74px;height:74px;border-radius:50%;background:var(--box);display:flex;align-items:center;justify-content:center;flex-direction:column">合計<b>¥00,000</b></div></div>
+          <div style="text-align:left;line-height:1.9">暮らし 40%<br>固定費 22%<br>たのしみ 28%<br>その他 10%</div>
+        </div></div>
+        <div class="note" style="text-align:center">← 左右にスワイプで前後の月へ →</div>
+        <div class="pad"><div class="box line" style="height:64px">グループをタップ → カテゴリの内訳が開く<br>（例：たのしみ ＝ 趣味・娯楽／衣服／美容／交際費）</div></div>
+        <div class="label">利用一覧　<span class="chip">たのしみで絞り込み中 ×</span></div>
+        <div class="list">
+          <div class="item"><span class="dot"></span><span class="t"><b style="font-size:13px">趣味・娯楽</b></span>¥0,000</div>
+          <div class="item"><span class="dot"></span><span class="t"><b style="font-size:13px">衣服</b></span>¥0,000</div>
+        </div>
+      </div>
+      <div class="tabbar"><div class="tab"><i></i>ホーム</div><div class="tab on"><i></i>統計</div><div class="tab"><i></i>予算</div><div class="tab"><i></i>資産</div></div>
+    </div>
+  </figure>
+
+  <!-- S-05 詳細シート -->
+  <figure>
+    <figcaption>S-05 利用の詳細<span>下から出るシート</span></figcaption>
+    <div class="phone">
+      <div class="scroll" style="opacity:.5"><div class="topbar"><b>統計</b></div><div class="pad"><div class="box" style="height:200px">（後ろの画面）</div></div></div>
+      <div class="dim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="row" style="align-items:center"><span>SAMPLE MART<br><small class="note">2026/01/10・確定・2月払い</small></span><span class="big" style="text-align:right">¥1,234</span></div>
+        <div class="label" style="padding:0">カテゴリ（グループごと）</div>
+        <div class="note">暮らし</div><div><span class="chip">食費</span><span class="chip">日用品</span><span class="chip">交通費</span><span class="chip">健康・医療</span></div>
+        <div class="note">固定費</div><div><span class="chip on">サブスク</span><span class="chip">通信費</span></div>
+        <div class="note">たのしみ</div><div><span class="chip">趣味・娯楽</span><span class="chip">衣服</span><span class="chip">美容</span><span class="chip">交際費</span></div>
+        <div class="box line" style="height:40px;justify-content:space-between;padding:0 12px">この店はいつもこのカテゴリ<span class="chip">オフ</span></div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- S-06 未分類 -->
+  <figure>
+    <figcaption>S-06 未分類の振り分け<span>全画面</span></figcaption>
+    <div class="phone">
+      <div class="scroll">
+        <div class="topbar"><span>‹ 戻る</span><span class="note">1 / 3</span></div>
+        <div class="pad"><div class="box dark" style="height:150px;flex-direction:column">利用先<span class="big">¥0,000</span><span class="note">10/03・確定</span></div></div>
+        <div class="label">どのカテゴリ？</div>
+        <div class="pad"><div class="note">暮らし</div><div class="row" style="flex-wrap:wrap;margin:4px 0 8px"><div class="box" style="height:40px;flex:0 0 46%">食費</div><div class="box" style="height:40px;flex:0 0 46%">日用品</div><div class="box" style="height:40px;flex:0 0 46%">交通費</div><div class="box" style="height:40px;flex:0 0 46%">健康・医療</div></div>
+        <div class="note">固定費</div><div class="row" style="flex-wrap:wrap;margin:4px 0 8px"><div class="box" style="height:40px;flex:0 0 46%">サブスク</div><div class="box" style="height:40px;flex:0 0 46%">通信費</div></div>
+        <div class="note">たのしみ・その他</div><div class="row" style="flex-wrap:wrap;margin:4px 0"><div class="box" style="height:40px;flex:0 0 46%">…</div></div></div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- S-07 手入力 -->
+  <figure>
+    <figcaption>S-07 手入力<span>ホームの「記録する」から開くシート</span></figcaption>
+    <div class="phone">
+      <div class="scroll" style="opacity:.5"><div class="photo" style="height:200px"></div></div>
+      <div class="dim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="note" style="text-align:center">支出（段階③で「収入」の切り替えを足す）</div>
+        <div class="box" style="height:80px"><span class="big">¥ 0</span></div>
+        <div class="row"><div class="box" style="height:40px">日付：今日</div><div class="box" style="height:40px">カテゴリ</div></div>
+        <div class="box line" style="height:40px">メモ（任意）</div>
+        <div class="box dark" style="height:46px;font-weight:700">記録する</div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- S-03 予算 -->
+  <figure>
+    <figcaption>S-03 予算<span>段階②</span></figcaption>
+    <div class="phone">
+      <div class="scroll">
+        <div class="topbar"><b style="font-size:16px">予算</b><span class="note">10月</span></div>
+        <div class="pad"><div class="box dark" style="height:120px;flex-direction:column;gap:6px">残り<span class="big">¥00,000</span><div style="width:80%;height:6px;border-radius:3px;background:#fff"><div style="width:62%;height:6px;border-radius:3px;background:#9a9a94"></div></div><span class="note">予算 ¥00,000 のうち 62%</span></div></div>
+        <div class="label">カテゴリごと（U-02 で決まったら）</div>
+        <div class="pad row"><div class="box" style="height:80px">食費<br>¥0,000<br><span class="note">残り ¥0,000</span></div><div class="box" style="height:80px">趣味・娯楽<br>¥0,000<br><span class="note">残り ¥0,000</span></div></div>
+        <div class="pad row"><div class="box" style="height:80px">衣服</div><div class="box" style="height:80px">交際費</div></div>
+      </div>
+      <div class="tabbar"><div class="tab"><i></i>ホーム</div><div class="tab"><i></i>統計</div><div class="tab on"><i></i>予算</div><div class="tab"><i></i>資産</div></div>
+    </div>
+  </figure>
+
+  <!-- S-04 資産 -->
+  <figure>
+    <figcaption>S-04 資産<span>段階③</span></figcaption>
+    <div class="phone">
+      <div class="scroll">
+        <div class="topbar"><b style="font-size:16px">資産</b></div>
+        <div class="pad"><div class="box dark" style="height:90px;flex-direction:column">資産の合計（9月末）<span class="big">¥000,000</span></div></div>
+        <div class="pad"><div class="box" style="height:160px">折れ線グラフ（月ごとの推移）</div></div>
+        <div class="label">月ごとの記録　<span class="chip">＋ 記録を足す</span></div>
+        <div class="list">
+          <div class="item"><span class="dot"></span><span class="t">9月末<small>銀行 ¥0 ／ NISA ¥0</small></span>¥000,000</div>
+          <div class="item"><span class="dot"></span><span class="t">8月末<small>銀行 ¥0 ／ NISA ¥0</small></span>¥000,000</div>
+        </div>
+      </div>
+      <div class="tabbar"><div class="tab"><i></i>ホーム</div><div class="tab"><i></i>統計</div><div class="tab"><i></i>予算</div><div class="tab on"><i></i>資産</div></div>
+    </div>
+  </figure>
+
+  <!-- S-08 メニュー -->
+  <figure>
+    <figcaption>S-08 メニュー<span>ホーム右上から</span></figcaption>
+    <div class="phone">
+      <div class="scroll">
+        <div class="topbar"><span>‹ 戻る</span><b>メニュー</b><span></span></div>
+        <div class="label">月1回の作業</div>
+        <div class="list"><div class="item"><span class="dot"></span><span class="t">CSV の取り込みと照合（S-09）</span>›</div></div>
+        <div class="label">設定</div>
+        <div class="list">
+          <div class="item"><span class="dot"></span><span class="t">カテゴリの対応表（S-10）</span>›</div>
+          <div class="item"><span class="dot"></span><span class="t">予算の設定（段階②）</span>›</div>
+          <div class="item"><span class="dot"></span><span class="t">合言葉</span>›</div>
+          <div class="item"><span class="dot"></span><span class="t">表示（写真・ダークモード・週の始まり）</span>›</div>
+        </div>
+        <div class="label" style="margin-top:8px">最終取り込み：10/06 21:00</div>
+      </div>
+    </div>
+  </figure>
+
+</div>
+
+<!-- PC -->
+<div class="grid">
+  <figure>
+    <figcaption>PC：ホーム<span>タブバー → 左の縦メニュー、2列</span></figcaption>
+    <div class="pc">
+      <div class="side">
+        <div class="tab on"><i></i>ホーム</div><div class="tab"><i></i>統計</div><div class="tab"><i></i>予算</div><div class="tab"><i></i>資産</div>
+                <div style="flex:1"></div><div class="tab"><i></i>メニュー</div>
+      </div>
+      <div class="pcmain">
+        <div>
+          <div class="photo" style="height:220px;border-radius:14px;"></div>
+          <div class="box dark" style="height:100px;flex-direction:column">今月の支出<span class="big">¥ 00,000</span></div>
+          <div class="row"><div class="box" style="height:56px">収入</div><div class="box" style="height:56px">残高</div></div>
+          <div class="box line" style="height:34px">10/27 引き落とし予定 ¥00,000</div>
+          <div class="note">やること</div>
+          <div class="row"><div class="box line" style="height:34px">未分類が3件 ›</div><div class="box line" style="height:34px">CSV で照合 ›</div><div class="box dark" style="height:34px">記録する</div></div>
+        </div>
+        <div>
+          <div class="note">支出トップ　<span class="chip on">今週</span><span class="chip">今月</span></div>
+          <div class="row"><div class="box photo" style="height:120px">1</div><div class="box photo" style="height:120px">2</div><div class="box photo" style="height:120px">3</div></div>
+          <div class="note">最近の利用</div>
+          <div class="list" style="border:1px solid #eeeeea;border-radius:12px">
+            <div class="item"><span class="dot"></span><span class="t"><b style="font-size:13px">食費</b><small>10/05</small></span>¥0,000</div>
+            <div class="item"><span class="dot"></span><span class="t"><b style="font-size:13px">交通費</b><small>10/04</small></span>¥0,000</div>
+            <div class="item"><span class="dot"></span><span class="t"><b style="font-size:13px">サブスク</b><small>10/04</small></span>¥0,000</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+</div>
+
+<!-- 遷移図 -->
+<div class="grid">
+  <figure style="width:100%">
+    <figcaption>画面遷移図</figcaption>
+    <svg class="flow" viewBox="0 0 1040 400" role="img" aria-label="画面遷移図">
+      <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#8a8a84"/></marker></defs>
+      <g font-size="13" fill="#55554f" text-anchor="middle">
+        <rect x="200" y="14" width="820" height="100" rx="14" fill="none" stroke="#c9c9c4" stroke-dasharray="5 4"/>
+        <text x="610" y="34" font-size="11" fill="#8a8a84">タブバーで行き来できる画面</text>
+        <g fill="none" stroke="#8a8a84" stroke-width="1.4" marker-end="url(#a)">
+          <path d="M150,68 H218"/>
+          <path d="M370,68 H458"/>
+          <path d="M260,91 C260,130 235,140 235,178"/>
+          <path d="M310,91 C310,130 435,140 435,178"/>
+          <path d="M350,91 C360,150 640,130 660,178"/>
+          <path d="M535,91 C535,130 700,140 700,178"/>
+          <path d="M370,84 C620,170 820,130 900,178"/>
+          <path d="M215,224 C215,260 150,265 150,298"/>
+          <path d="M255,224 C255,260 330,265 330,298"/>
+        </g>
+        <g fill="#f4f4f2" stroke="#c9c9c4">
+          <rect x="20" y="45" width="130" height="46" rx="10"/>
+          <rect x="220" y="45" width="150" height="46" rx="10"/>
+          <rect x="460" y="45" width="150" height="46" rx="10"/>
+          <rect x="660" y="45" width="140" height="46" rx="10"/>
+          <rect x="855" y="45" width="140" height="46" rx="10"/>
+          <rect x="160" y="180" width="150" height="44" rx="10"/>
+          <rect x="360" y="180" width="150" height="44" rx="10"/>
+          <rect x="600" y="180" width="160" height="44" rx="10"/>
+          <rect x="855" y="180" width="140" height="44" rx="10"/>
+          <rect x="75" y="300" width="150" height="44" rx="10"/>
+          <rect x="255" y="300" width="150" height="44" rx="10"/>
+        </g>
+        <text x="85" y="73">S-00 合言葉</text>
+        <text x="295" y="73" font-weight="700">S-01 ホーム</text>
+        <text x="535" y="73" font-weight="700">S-02 統計</text>
+        <text x="730" y="73">S-03 予算（②）</text>
+        <text x="925" y="73">S-04 資産（③）</text>
+        <text x="235" y="207">S-08 メニュー</text>
+        <text x="435" y="207">S-06 未分類</text>
+        <text x="680" y="207">S-05 利用の詳細</text>
+        <text x="925" y="207">S-07 手入力</text>
+        <text x="150" y="327">S-09 CSV 照合</text>
+        <text x="330" y="327">S-10 対応表</text>
+        <g font-size="11" fill="#8a8a84">
+          <text x="185" y="60">初回だけ</text>
+          <text x="414" y="60">支出トップ</text>
+          <text x="205" y="150">右上</text>
+          <text x="400" y="150">やること：未分類</text>
+          <text x="470" y="128">最近の利用</text>
+          <text x="660" y="132">一覧の1行</text>
+          <text x="800" y="150">ホームの「記録する」</text>
+          <text x="435" y="242">1件ずつ振り分けて次へ</text>
+          <text x="680" y="242">シート：カテゴリを変える</text>
+          <text x="925" y="242">シート</text>
+        </g>
+      </g>
+    </svg>
+  </figure>
+</div>
+</body>
+</html>
