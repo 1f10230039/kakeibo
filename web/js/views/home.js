@@ -21,6 +21,7 @@ export function render(ctx) {
   const start = topRange === 'week' ? C.startOfWeek(today, data.settings.weekStart) : new Date(today.getFullYear(), today.getMonth(), 1);
   const top = C.categoryTotals(C.spendBetween(txs, start, today));
   const recent = C.newestFirst(txs.filter(C.isSpend)).slice(0, 3);
+  const names = C.displayNames(data.rules);
   const groupOf = name => (name === '未分類' ? '未分類' : (data.categories.find(c => c.name === name) || { group: 'その他' }).group);
 
   return `
@@ -71,16 +72,16 @@ export function render(ctx) {
         </a>`).join('')}</div>` : `<p class="empty">${topRange === 'week' ? '今週' : '今月'}の支出はまだありません</p>`}
 
       <div class="section"><h2>最近の利用</h2><a class="more" href="#/stats">すべて ${icon('chevron')}</a></div>
-      ${recent.length ? `<div class="list card">${recent.map(t => row(t, groupOf(t.category || '未分類'), hidden)).join('')}</div>` : '<p class="empty">まだ利用がありません</p>'}
+      ${recent.length ? `<div class="list card">${recent.map(t => row(t, groupOf(t.category || '未分類'), hidden, C.subtitleOf(t, names))).join('')}</div>` : '<p class="empty">まだ利用がありません</p>'}
     </div>
   </div>`;
 }
 
-export function row(t, group, hidden) {
+export function row(t, group, hidden, sub = '') {
   const d = C.parseYmd(t.date);
   return `<button class="row" data-tx="${esc(t.id)}">
     ${iconMark(t.category, group)}
-    <span class="t"><b>${esc(t.category || '未分類')}</b><small>${d.getMonth() + 1}/${d.getDate()}${t.status === '速報' ? '<span class="badge">速報</span>' : ''}${t.source === '手入力' ? '<span class="badge">手入力</span>' : ''}</small></span>
+    <span class="t"><b><span class="cat-name">${esc(t.category || '未分類')}</span>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</b><small>${d.getMonth() + 1}/${d.getDate()}${t.status === '速報' ? '<span class="badge">速報</span>' : ''}${t.source === '手入力' ? '<span class="badge">手入力</span>' : ''}</small></span>
     <span class="a">${money(t.amount, hidden)}</span>
   </button>`;
 }

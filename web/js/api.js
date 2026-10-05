@@ -88,7 +88,8 @@ export async function fetchData() {
 }
 
 export const setCategory = (id, category) => call('setCategory', { id, category });
-export const setRule = (merchant, category) => call('setRule', { merchant, category });
+export const setRule = (merchant, category, displayName) => call('setRule', displayName === undefined ? { merchant, category } : { merchant, category, displayName });
+export const setMemo = (id, memo) => call('setMemo', { id, memo });
 export const addManual = (entry) => call('addManual', entry);
 export const deleteManual = (id) => call('deleteManual', { id });
 export const resolveSokuho = (id) => call('resolveSokuho', { id });

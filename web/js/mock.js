@@ -56,7 +56,8 @@ const DB = {
     ['その他', 'その他'],
   ].map(([name, group], i) => ({ name, group, order: i + 1 })),
   rules: [
-    { merchant: 'SAMPLE MART', category: '食費' }, { merchant: 'JR EAST', category: '交通費' }, { merchant: 'APPLE COM BILL', category: 'サブスク' },
+    { merchant: 'SAMPLE MART', category: '食費', displayName: '' }, { merchant: 'JR EAST', category: '交通費', displayName: '' },
+    { merchant: 'APPLE COM BILL', category: 'サブスク', displayName: 'Apple One' },
   ],
   budgets: [], assets: [],
   settings: { weekStart: '月', lastIngest: `${d(0)} 06:12`, unreadableMails: 0 },
@@ -73,7 +74,8 @@ export async function mockCall(action, p) {
     case 'setCategory': { const t = find(p.id); t.category = p.category; t.categoryBy = p.category ? '個別' : '未分類'; return { id: p.id }; }
     case 'setRule': {
       const r = DB.rules.find(r => norm(r.merchant) === norm(p.merchant));
-      r ? (r.category = p.category) : DB.rules.push({ merchant: p.merchant, category: p.category });
+      if (r) { r.category = p.category; if (p.displayName !== undefined) r.displayName = p.displayName; }
+      else DB.rules.push({ merchant: p.merchant, category: p.category, displayName: p.displayName || '' });
       let updated = 0;
       DB.transactions.filter(t => t.categoryBy !== '個別' && t.status !== '取消' && norm(t.merchant) === norm(p.merchant))
         .forEach(t => { t.category = p.category; t.categoryBy = '対応表'; updated++; });
@@ -85,6 +87,7 @@ export async function mockCall(action, p) {
         category: p.category || '', categoryBy: p.category ? '個別' : '未分類', source: '手入力', memo: p.memo || '' });
       return { id };
     }
+    case 'setMemo': find(p.id).memo = p.memo; return { id: p.id };
     case 'deleteManual': case 'resolveSokuho': find(p.id).status = '取消'; return { id: p.id };
     case 'setSetting': DB.settings.weekStart = p.value; return p;
     default: throw new Error('mock: ' + action);

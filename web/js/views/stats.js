@@ -65,7 +65,7 @@ export function render(ctx) {
 
       <section class="tx-list">
         <div class="section"><h2>利用一覧</h2>${filterLabel ? `<button class="chip filter" data-act="clear">${esc(filterLabel)}で絞り込み中 ${icon('close')}</button>` : ''}</div>
-        ${list.length ? byDate(list, groupOf, hidden) : '<p class="empty">この期間の利用はありません</p>'}
+        ${list.length ? byDate(list, groupOf, hidden, C.displayNames(data.rules)) : '<p class="empty">この期間の利用はありません</p>'}
       </section>
     </div>
   </div>`;
@@ -115,7 +115,7 @@ function pieChart(groups, hidden) {
     <div class="legend">${legend}</div>`;
 }
 
-function byDate(list, groupOf, hidden) {
+function byDate(list, groupOf, hidden, names) {
   const sorted = C.newestFirst(list);
   let html = '', current = '';
   sorted.forEach(t => {
@@ -124,7 +124,7 @@ function byDate(list, groupOf, hidden) {
       current = t.date;
       html += `<h3 class="date">${esc(C.mdw(C.parseYmd(t.date)))}</h3><div class="list card">`;
     }
-    html += row(t, groupOf(t.category), hidden);
+    html += row(t, groupOf(t.category), hidden, C.subtitleOf(t, names));
   });
   return html + '</div>';
 }

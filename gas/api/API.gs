@@ -128,7 +128,7 @@ const ACTIONS = {
       categories: store.rows(SHEET.CATEGORIES)
         .map(r => ({ name: r['カテゴリ'], group: r['グループ'], order: Number(r['並び順']) }))
         .sort((a, b) => a.order - b.order),
-      rules: store.rows(SHEET.RULES).map(r => ({ merchant: r['利用先'], category: r['カテゴリ'] })),
+      rules: store.rows(SHEET.RULES).map(r => ({ merchant: r['利用先'], category: r['カテゴリ'], displayName: r['表示名'] || '' })),
       budgets: store.rows(SHEET.BUDGET).map(r => ({ month: r['月'], target: r['対象'], amount: Number(r['金額']) })),
       assets: store.rows(SHEET.ASSETS).map(r => ({ date: r['記録日'], item: r['項目'], amount: Number(r['金額']) })),
       settings: {
@@ -150,20 +150,23 @@ const ACTIONS = {
   },
 
   /**
-   * 「この店はいつもこのカテゴリ」（F-06）。対応表に足すか変えて、
+   * 「この店はいつもこのカテゴリ（と名前）」（F-06）。対応表に足すか変えて、
    * 同じ利用先の行のうち、個別に決めたもの以外にまとめて当てる。
+   * displayName（表示名）は、一覧で用途の横に出す名前（例：YouTube Premium）。送らなければ今のまま。
    */
-  setRule({ merchant, category }, { store, now }) {
+  setRule({ merchant, category, displayName }, { store, now }) {
     checkText(merchant, 'merchant', 100, false);
     checkCategory(store, category, false);
+    if (displayName !== undefined) checkText(displayName, 'displayName', 100, true);
     const key = normalizeMerchant(merchant);
     const rule = store.rows(SHEET.RULES).find(r => normalizeMerchant(r['利用先']) === key);
     if (rule) {
       rule['カテゴリ'] = category;
       rule['決めた日'] = now().slice(0, 10);
+      if (displayName !== undefined) rule['表示名'] = displayName.trim();
       store.update(SHEET.RULES, rule);
     } else {
-      store.append(SHEET.RULES, [{ '利用先': merchant.trim(), 'カテゴリ': category, '決めた日': now().slice(0, 10) }]);
+      store.append(SHEET.RULES, [{ '利用先': merchant.trim(), 'カテゴリ': category, '決めた日': now().slice(0, 10), '表示名': (displayName || '').trim() }]);
     }
     let updated = 0;
     store.rows(SHEET.TX)
@@ -175,6 +178,15 @@ const ACTIONS = {
         updated++;
       });
     return { updated };
+  },
+
+  /** 1件だけの名前（メモ）。一覧で用途の横に出る。空にすると消える。手入力でもメールの利用でも付けられる。 */
+  setMemo({ id, memo }, { store }) {
+    const row = findTx(store, id);
+    checkText(memo, 'memo', 100, true);
+    row['メモ'] = (memo || '').trim();
+    store.update(SHEET.TX, row);
+    return { id };
   },
 
   /** 手入力の支出を足す（F-07）。 */

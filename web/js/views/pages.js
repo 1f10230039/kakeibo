@@ -59,7 +59,8 @@ export const unclassified = {
         <div class="big">${money(t.amount, ctx.hidden)}</div>
         <div class="compare">${esc(C.mdw(C.parseYmd(t.date)))}・${esc(t.status)}</div>
       </section>
-      ${t.merchant ? `<label class="switch-row"><span>この店はいつもこのカテゴリ<small>次からは自動で振り分けます</small></span><input type="checkbox" id="always" checked><span class="switch" aria-hidden="true"></span></label>` : ''}
+      ${t.merchant ? `<label class="switch-row"><span>この店はいつもこの内容<small>次からはカテゴリと名前を自動で付けます</small></span><input type="checkbox" id="always" checked><span class="switch" aria-hidden="true"></span></label>` : ''}
+      <label class="field"><span>名前（一覧で用途の横に出ます。なくてもよい）</span><input id="name" maxlength="100" autocomplete="off" placeholder="例：YouTube Premium" value="${esc(t.memo)}"></label>
       ${categoryPicker(ctx.data.categories, '')}
       <button class="btn ghost wide" data-act="skip">あとで決める</button>
     </div>`;
@@ -71,7 +72,12 @@ export const unclassified = {
     root.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', async () => {
       const always = root.querySelector('#always')?.checked;
       const cat = b.dataset.pick;
-      await ctx.write(always ? api.setRule(t.merchant, cat) : api.setCategory(t.id, cat), always ? `「${t.merchant}」をいつも${cat}にしました` : `${cat}にしました`);
+      const name = root.querySelector('#name').value.trim();
+      if (/^[=+\-@]/.test(name)) { toast('名前を = + - @ で始めることはできません', 'warn'); return; }
+      const job = always
+        ? api.setRule(t.merchant, cat, name)
+        : api.setCategory(t.id, cat).then(() => (name !== (t.memo || '') ? api.setMemo(t.id, name) : null));
+      await ctx.write(job, always ? `「${t.merchant}」をいつも${cat}にしました` : `${cat}にしました`);
     }));
     root.querySelector('[data-act="skip"]').addEventListener('click', () => { skipped.add(t.id); ctx.rerender(); });
   },
@@ -139,19 +145,32 @@ export const rules = {
   render(ctx) {
     const list = [...ctx.data.rules].sort((a, b) => a.merchant.localeCompare(b.merchant));
     return `<div class="page">${backBar('カテゴリの対応表', '#/menu')}
-      <p class="lead">確定のメールの店名が、ここにあるカテゴリに自動で振り分けられます。タップすると変えられます。</p>
+      <p class="lead">確定のメールの店名が、ここにあるカテゴリと名前に自動で振り分けられます。タップすると変えられます。</p>
       ${list.length ? `<div class="list card">${list.map(r => `
-        <button class="row link" data-merchant="${esc(r.merchant)}"><span class="t"><b>${esc(r.merchant)}</b><small>${esc(r.category)}</small></span>${icon('chevron')}</button>
-        ${editing === r.merchant ? `<div class="row-edit">${categoryPicker(ctx.data.categories, r.category)}</div>` : ''}`).join('')}</div>`
+        <button class="row link" data-merchant="${esc(r.merchant)}"><span class="t"><b>${esc(r.merchant)}</b><small>${esc(r.category)}${r.displayName ? '・' + esc(r.displayName) : ''}</small></span>${icon('chevron')}</button>
+        ${editing === r.merchant ? `<div class="row-edit">
+          <label class="field"><span>名前（一覧で用途の横に出ます）</span><input id="rule-name" maxlength="100" autocomplete="off" placeholder="例：YouTube Premium" value="${esc(r.displayName)}"></label>
+          ${categoryPicker(ctx.data.categories, r.category)}
+          <button class="btn primary wide" data-act="save-rule" data-category="${esc(r.category)}">保存</button>
+        </div>` : ''}`).join('')}</div>`
         : '<p class="empty">まだありません。利用の詳細で「この店はいつもこのカテゴリ」をオンにすると増えます。</p>'}
     </div>`;
   },
   mount(root, ctx) {
     root.querySelectorAll('[data-merchant]').forEach(b => b.addEventListener('click', () => { editing = editing === b.dataset.merchant ? null : b.dataset.merchant; ctx.rerender(); }));
-    root.querySelectorAll('.row-edit [data-pick]').forEach(b => b.addEventListener('click', async () => {
-      const m = editing; editing = null;
-      await ctx.write(api.setRule(m, b.dataset.pick), `「${m}」を${b.dataset.pick}にしました`);
+    const edit = root.querySelector('.row-edit');
+    if (!edit) return;
+    let category = edit.querySelector('[data-act="save-rule"]').dataset.category;
+    edit.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => {
+      category = b.dataset.pick;
+      edit.querySelectorAll('[data-pick]').forEach(x => x.classList.toggle('on', x.dataset.pick === category));
     }));
+    edit.querySelector('[data-act="save-rule"]').addEventListener('click', async () => {
+      const name = edit.querySelector('#rule-name').value.trim();
+      if (/^[=+\-@]/.test(name)) { toast('名前を = + - @ で始めることはできません', 'warn'); return; }
+      const m = editing; editing = null;
+      await ctx.write(api.setRule(m, category, name), `「${m}」を保存しました`);
+    });
   },
 };
 

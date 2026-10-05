@@ -140,6 +140,28 @@ test('setRule：対応表に足し、同じ利用先の「個別」以外の行�
   assert.strictEqual(store.tables['対応表'][0]['カテゴリ'], '食費');
 });
 
+test('setRule：表示名を付ける。送らなければ前の表示名のまま', () => {
+  const { call, store } = setup();
+  call({ key: KEY, action: 'setRule', params: { merchant: 'APPLE COM BILL', category: 'サブスク', displayName: 'YouTube Premium' } });
+  assert.strictEqual(store.tables['対応表'][0]['表示名'], 'YouTube Premium');
+  call({ key: KEY, action: 'setRule', params: { merchant: 'APPLE COM BILL', category: '趣味・娯楽' } });
+  assert.strictEqual(store.tables['対応表'][0]['表示名'], 'YouTube Premium');
+  assert.strictEqual(store.tables['対応表'][0]['カテゴリ'], '趣味・娯楽');
+  const data = call({ key: KEY, action: 'getData', params: { from: '2026-01', to: '2026-12' } }).data;
+  assert.deepStrictEqual(data.rules, [{ merchant: 'APPLE COM BILL', category: '趣味・娯楽', displayName: 'YouTube Premium' }]);
+  assert.strictEqual(call({ key: KEY, action: 'setRule', params: { merchant: 'X', category: '食費', displayName: '=CMD()' } }).ok, false);
+});
+
+test('setMemo：1件だけの名前を付ける・消す。式の書き出しは断る', () => {
+  const { call, store } = setup();
+  assert.strictEqual(call({ key: KEY, action: 'setMemo', params: { id: 'm_K1_1', memo: ' YouTube Premium ' } }).ok, true);
+  assert.strictEqual(store.tables['取引'][0]['メモ'], 'YouTube Premium');
+  call({ key: KEY, action: 'setMemo', params: { id: 'm_K1_1', memo: '' } });
+  assert.strictEqual(store.tables['取引'][0]['メモ'], '');
+  assert.strictEqual(call({ key: KEY, action: 'setMemo', params: { id: 'm_K1_1', memo: '@x' } }).ok, false);
+  assert.strictEqual(call({ key: KEY, action: 'setMemo', params: { id: 'h_old', memo: 'x' } }).ok, false); // 取消の行は対象外
+});
+
 // ---- 手入力 ----
 test('addManual：足す。金額・日付・メモの形が違えば断る', () => {
   const { call, store } = setup();

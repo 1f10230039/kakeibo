@@ -17,7 +17,7 @@ const SHEET = {
 
 const HEADERS = {
   [SHEET.TX]: ['id', '種類', '利用日', '利用先', '金額', '支払月', '状態', 'カテゴリ', 'カテゴリの決め方', '出どころ', '対応する速報', 'メモ', '取り込み日時'],
-  [SHEET.RULES]: ['利用先', 'カテゴリ', '決めた日'],
+  [SHEET.RULES]: ['利用先', 'カテゴリ', '決めた日', '表示名'],
   [SHEET.CATEGORIES]: ['カテゴリ', 'グループ', '並び順'],
   [SHEET.BUDGET]: ['月', '対象', '金額'],
   [SHEET.ASSETS]: ['記録日', '項目', '金額'],
@@ -111,10 +111,22 @@ function toValues(sheet, row) {
  */
 function writeRows(sheet, startRow, rowObjects) {
   if (rowObjects.length === 0) return;
+  ensureHeader(sheet);
   const header = HEADERS[sheet.getName()];
   const range = sheet.getRange(startRow, 1, rowObjects.length, header.length);
   range.setNumberFormats(rowObjects.map(() => header.map(columnFormat)));
   range.setValues(rowObjects.map(r => toValues(sheet, r)));
+}
+
+/**
+ * あとから足した列（対応表の「表示名」など）の見出しが、シートになければ右端に足す。
+ * 前からある列の並びは変えない前提（新しい列はいつも右端に足す）。
+ */
+function ensureHeader(sheet) {
+  const header = HEADERS[sheet.getName()];
+  const width = sheet.getLastColumn();
+  if (width >= header.length) return;
+  sheet.getRange(1, width + 1, 1, header.length - width).setValues([header.slice(width)]).setFontWeight('bold');
 }
 
 /** 末尾に足す。 */

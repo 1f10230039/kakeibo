@@ -168,6 +168,25 @@ export function bucketTotals(txs, p) {
   return p.buckets.map(b => ({ ...b, total: sum(spendBetween(txs, b.start, b.end)) }));
 }
 
+// ---- 名前（サブタイトル） ----
+
+/** 利用先をくらべやすい形にそろえる（GAS の normalizeMerchant と同じ決まり）。 */
+export function normalizeMerchant(name) {
+  return String(name || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
+/** 対応表から「そろえた利用先 → 表示名」の表を作る。 */
+export function displayNames(rules) {
+  const map = new Map();
+  rules.forEach(r => { if (r.displayName) map.set(normalizeMerchant(r.merchant), r.displayName); });
+  return map;
+}
+
+/** 一覧で用途の横に出す名前：この利用だけの名前（メモ）があればそれ、なければ店の表示名、どちらもなければ空。 */
+export function subtitleOf(t, names) {
+  return t.memo || (t.merchant && names.get(normalizeMerchant(t.merchant))) || '';
+}
+
 // ---- 表示 ----
 
 export function yen(n) {

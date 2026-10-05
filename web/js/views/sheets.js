@@ -21,36 +21,60 @@ export function openDetail(ctx, id) {
   const d = C.parseYmd(t.date);
   const stale = C.staleSokuho([t], ctx.today).length > 0;
   const canRule = !!t.merchant;
+  const ruleName = canRule ? C.displayNames(ctx.data.rules).get(C.normalizeMerchant(t.merchant)) || '' : '';
+  const alwaysOn = canRule && (t.categoryBy === '対応表' || (!t.memo && !!ruleName));
 
   openSheet(`
-    <div class="detail-head">${iconMark(t.category, group)}<div><div class="detail-cat">${esc(t.category || '未分類')}</div>
+    <div class="detail-head">${iconMark(t.category, group)}<div><div class="detail-cat">${esc(t.category || '未分類')}${C.subtitleOf(t, C.displayNames(ctx.data.rules)) ? `<span class="sub">${esc(C.subtitleOf(t, C.displayNames(ctx.data.rules)))}</span>` : ''}</div>
       <div class="detail-merchant">${t.merchant ? esc(t.merchant) : t.source === '手入力' ? '手入力' : '速報：店名は確定版のメールで届きます'}</div></div>
       <div class="detail-amt">${money(t.amount, ctx.hidden)}</div></div>
     <dl class="facts">
       <div><dt>利用日</dt><dd>${esc(C.mdw(d))}</dd></div>
       <div><dt>状態</dt><dd>${esc(t.status)}</dd></div>
       ${t.payMonth ? `<div><dt>支払月</dt><dd>${esc(t.payMonth.replace('-', '年'))}月${t.status === '速報' ? '（仮）' : ''}</dd></div>` : ''}
-      ${t.memo ? `<div><dt>メモ</dt><dd>${esc(t.memo)}</dd></div>` : ''}
     </dl>
+    ${canRule ? `<label class="switch-row"><span>この店はいつもこの内容<small>カテゴリと名前を「${esc(t.merchant)}」の他の利用にもまとめて付けます</small></span>
+      <input type="checkbox" id="always" ${alwaysOn ? 'checked' : ''}><span class="switch" aria-hidden="true"></span></label>` : ''}
     <div class="sheet-label">カテゴリ</div>
     ${categoryPicker(ctx.data.categories, t.category)}
-    ${canRule ? `<label class="switch-row"><span>この店はいつもこのカテゴリ<small>「${esc(t.merchant)}」の他の利用にもまとめて付けます</small></span>
-      <input type="checkbox" id="always" ${t.categoryBy === '対応表' ? 'checked' : ''}><span class="switch" aria-hidden="true"></span></label>` : ''}
+    <div class="sheet-label">名前（一覧で用途の横に出ます。なくてもよい）</div>
+    <div class="name-row"><input id="name" maxlength="100" autocomplete="off" placeholder="例：YouTube Premium" value="${esc(t.memo || ruleName)}">
+      <button class="btn small" data-act="name">保存</button></div>
     <div class="sheet-actions">
       ${t.source === '手入力' ? '<button class="btn danger" data-act="delete">この記録を消す</button>' : ''}
       ${stale ? '<button class="btn danger" data-act="cancel">キャンセルだったので取り消す</button>' : ''}
     </div>
   `, (sheet, close) => {
+    const always = () => !!sheet.querySelector('#always')?.checked;
+    const nameEl = sheet.querySelector('#name');
+    const name = () => nameEl.value.trim();
+    const badName = () => { if (/^[=+\-@]/.test(name())) { toast('名前を = + - @ で始めることはできません', 'warn'); return true; } return false; };
+
     sheet.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', async () => {
+      if (badName()) return;
       const cat = b.dataset.pick;
-      const always = sheet.querySelector('#always')?.checked;
       // 対応表は「個別」に決めた行を変えないので、この行が個別なら、この行だけは別に変える
-      const job = always
-        ? api.setRule(t.merchant, cat).then(() => (t.categoryBy === '個別' ? api.setCategory(t.id, cat) : null))
+      const job = always()
+        ? api.setRule(t.merchant, cat, name()).then(() => (t.categoryBy === '個別' ? api.setCategory(t.id, cat) : null))
         : api.setCategory(t.id, cat);
-      await ctx.write(job, always ? `「${t.merchant}」をいつも${cat}にしました` : `${cat}にしました`);
+      await ctx.write(job, always() ? `「${t.merchant}」をいつも${cat}にしました` : `${cat}にしました`);
       close();
     }));
+
+    sheet.querySelector('[data-act="name"]').addEventListener('click', async () => {
+      if (badName()) return;
+      if (always()) {
+        if (!t.category) { toast('先にカテゴリを選んでください', 'warn'); return; }
+        // 店の名前にするので、この利用だけの名前があれば消す（消さないと、こちらが優先して出てしまう）
+        const job = api.setRule(t.merchant, t.category, name()).then(() => (t.memo ? api.setMemo(t.id, '') : null));
+        await ctx.write(job, name() ? `「${t.merchant}」の名前を「${name()}」にしました` : '名前を消しました');
+      } else {
+        await ctx.write(api.setMemo(t.id, name()), name() ? `名前を「${name()}」にしました` : '名前を消しました');
+      }
+      close();
+    });
+    nameEl.addEventListener('keydown', e => { if (e.key === 'Enter') sheet.querySelector('[data-act="name"]').click(); });
+
     sheet.querySelector('[data-act="delete"]')?.addEventListener('click', async () => {
       if (!confirm('この手入力の記録を消しますか？')) return;
       await ctx.write(api.deleteManual(t.id), '消しました');
@@ -74,7 +98,7 @@ export function openManual(ctx) {
     <label class="amount-input"><span>¥</span><input id="amount" inputmode="numeric" pattern="[0-9]*" placeholder="0" autocomplete="off" aria-label="金額"></label>
     <div class="field-row">
       <label class="field"><span>日付</span><input id="date" type="date" value="${C.ymd(ctx.today)}" max="${C.ymd(ctx.today)}"></label>
-      <label class="field grow"><span>メモ（なくてもよい）</span><input id="memo" maxlength="200" autocomplete="off"></label>
+      <label class="field grow"><span>名前（なくてもよい）</span><input id="memo" maxlength="100" autocomplete="off" placeholder="例：コンビニ"></label>
     </div>
     <div class="sheet-label">カテゴリ（あとで決めてもよい）</div>
     ${categoryPicker(ctx.data.categories, '')}
@@ -95,7 +119,7 @@ export function openManual(ctx) {
       const date = sheet.querySelector('#date').value;
       const memo = sheet.querySelector('#memo').value.trim();
       if (!Number.isInteger(amount) || amount < 1) { toast('金額を入れてください', 'warn'); amountEl.focus(); return; }
-      if (/^[=+\-@]/.test(memo)) { toast('メモを = + - @ で始めることはできません', 'warn'); return; }
+      if (/^[=+\-@]/.test(memo)) { toast('名前を = + - @ で始めることはできません', 'warn'); return; }
       await ctx.write(api.addManual({ date, amount, category, memo }), `${C.yen(amount)} を記録しました`);
       close();
     });

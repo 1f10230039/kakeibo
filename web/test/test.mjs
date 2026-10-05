@@ -89,6 +89,14 @@ test('確認が必要な速報：14日たったもの', () => {
   assert.deepStrictEqual(C.staleSokuho(txs, D(2026, 10, 6)).map(t => t.amount), [1]);
 });
 
+test('名前（サブタイトル）：この利用だけの名前 → 店の表示名 → なし の順', () => {
+  const names = C.displayNames([{ merchant: 'Google *YouTubePremium', category: 'サブスク', displayName: 'YouTube Premium' }, { merchant: 'SAMPLE MART', category: '食費', displayName: '' }]);
+  assert.strictEqual(C.subtitleOf({ merchant: 'GOOGLE *YOUTUBEPREMIUM ', memo: '' }, names), 'YouTube Premium'); // 表記ゆれも同じ店
+  assert.strictEqual(C.subtitleOf({ merchant: 'GOOGLE *YOUTUBEPREMIUM', memo: '家族の分' }, names), '家族の分');
+  assert.strictEqual(C.subtitleOf({ merchant: 'SAMPLE MART', memo: '' }, names), '');
+  assert.strictEqual(C.subtitleOf({ merchant: '', memo: '' }, names), '');
+});
+
 test('金額の書き方', () => {
   assert.strictEqual(C.yen(1234567), '¥1,234,567');
 });
