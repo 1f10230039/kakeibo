@@ -3,6 +3,7 @@
 // 配置は docs/02_画面設計.md の S-02。
 // 切り替えでは作り直さず、変わったところだけ書き換える（morphable）。棒は前の高さから新しい高さへ伸び縮みし、
 // 円は前の割合から新しい割合へ動く（初めて出たときは、ぐるっと描かれる）。
+// 一覧は日付順とカテゴリー別を切り替えられる（10/7 本人）。カテゴリー別は合計の多い順、収入の一覧では名前（バイト代など）ごと。
 
 import * as C from '../calc.js';
 import { GROUP_CLASS } from '../icons.js';
@@ -11,7 +12,7 @@ import { row } from './home.js';
 import { incomeRow } from './income.js';
 
 const UNIT_NAME = { week: '週', month: '月', year: '年' };
-const view = { unit: 'month', offset: 0, chart: 'bar', flow: '支出', bucket: null, group: null, cat: null, dir: 0 };
+const view = { unit: 'month', offset: 0, chart: 'bar', flow: '支出', bucket: null, group: null, cat: null, dir: 0, sort: 'date' };
 
 export const morphable = true;
 
@@ -73,8 +74,10 @@ export function render(ctx) {
       </section>
 
       <section class="tx-list">
-        <div class="section"><h2>一覧</h2>${filterLabel ? `<button class="chip filter" data-key="${esc(filterLabel)}" data-act="clear">${esc(filterLabel)}で絞り込み中 ${icon('close')}</button>` : ''}</div>
-        ${list.length ? byDate(list, groupOf, hidden, C.displayNames(data.rules)) : `<p class="empty">この期間の${showIncome ? '収入' : '利用'}はありません</p>`}
+        <div class="section"><h2>一覧</h2>${seg('sort', [['date', '日付順'], ['cat', showIncome ? '名前別' : 'カテゴリー別']], view.sort, '一覧の並べ方')}</div>
+        ${filterLabel ? `<div class="filter-row" data-key="filter"><button class="chip filter" data-key="${esc(filterLabel)}" data-act="clear">${esc(filterLabel)}で絞り込み中 ${icon('close')}</button></div>` : ''}
+        ${!list.length ? `<p class="empty">この期間の${showIncome ? '収入' : '利用'}はありません</p>`
+          : (view.sort === 'cat' ? byCategory : byDate)(list, groupOf, hidden, C.displayNames(data.rules))}
       </section>
     </div>
   </div>`;
@@ -88,7 +91,7 @@ function barChart(buckets, hidden, income = false) {
     const h = b.total ? Math.max(0.035, b.total / max) : 0.012;
     const on = view.bucket === i;
     return `<button class="bar${on ? ' on' : ''}" data-bucket="${i}" aria-pressed="${on}" aria-label="${esc(b.label)} ${hidden ? '' : esc(C.yen(b.total))}">
-      <span class="col" data-vars="--h:${h.toFixed(4)};--i:${i}" data-from="--h:0">${on && !hidden ? `<span class="val">${esc(C.yen(b.total))}</span>` : ''}<span class="fill"></span></span>
+      <span class="col" data-vars="--h:${h.toFixed(4)};--i:${i}" data-from="--h:0">${on && !hidden ? `<span class="val" data-key="v">${esc(C.yen(b.total))}</span>` : ''}<span class="fill" data-key="f"></span></span>
       <span class="lab">${esc(b.label)}</span>
     </button>`;
   }).join('')}</div>`;
@@ -158,15 +161,57 @@ function byDate(list, groupOf, hidden, names) {
   return html + '</div>';
 }
 
+/** カテゴリー別：カテゴリー（収入は名前）ごとに、合計の多い順。中は新しい順。
+ *  見出しにカテゴリーが出るので、行の名前は、この利用だけの名前 → 店の表示名 → カテゴリー の順（利用先そのものは出さない：10/6 本人）。 */
+function byCategory(list, groupOf, hidden, names) {
+  const groups = new Map();
+  list.forEach(t => {
+    const k = t.type === '収入' ? t.memo || '入金' : t.category || '未分類';
+    groups.set(k, [...(groups.get(k) || []), t]);
+  });
+  return [...groups].map(([name, txs]) => ({ name, txs, total: C.sum(txs) }))
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'ja'))
+    .map(g => `<h3 class="date cat-head" data-key="ch:${esc(g.name)}"><span>${esc(g.name)}<small>${g.txs.length}件</small></span>${money(g.total, hidden)}</h3>
+      <div class="list card" data-key="c:${esc(g.name)}">${C.newestFirst(g.txs).map(t => (t.type === '収入' ? incomeRow(t, hidden)
+        : row(t, groupOf(t.category), hidden, '', C.subtitleOf(t, names) || t.category || '未分類'))).join('')}</div>`)
+    .join('');
+}
+
+const placed = new WeakSet(); // もう位置を決めた金額の札
+
+/**
+ * 選んだ棒の金額の札：棒より横に広いので、となりの棒のほうが高いと隠れる（10/7 本人）。
+ * 札が横に重なる棒のうち、いちばん高い棒（伸び縮みし終わったときの高さ）より上に出す。初めて出たときは、動かさずにその場所に置く。
+ */
+function liftValue(root) {
+  const val = root.querySelector('.bar .val');
+  if (!val) return;
+  const cols = [...root.querySelectorAll('.bar .col')];
+  const own = val.parentElement, i = cols.indexOf(own), w = val.offsetWidth, r = own.getBoundingClientRect();
+  const left = i === 0 ? r.left : i === cols.length - 1 ? r.right - w : (r.left + r.right - w) / 2; // CSS と同じ寄せ方（端の棒は内側へ）
+  const heightOf = c => Number(/--h:([\d.]+)/.exec(c.dataset.vars || '')?.[1] || 0);
+  const lift = Math.max(0, ...cols.filter(c => {
+    const b = c.getBoundingClientRect();
+    return b.right > left + 2 && b.left < left + w - 2; // 角の丸みにかするだけなら数えない
+  }).map(heightOf));
+  if (placed.has(val)) { val.style.setProperty('--lift', lift); return; }
+  placed.add(val);
+  val.style.transition = 'none';
+  val.style.setProperty('--lift', lift);
+  void val.offsetWidth; // いまの位置で一度描いてから、動きを戻す
+  val.style.transition = '';
+}
+
 export function mount(root, ctx) {
   const page = root.firstElementChild;
   pieShown.clear(); // 画面に入るたびに、円はぐるっと描き直す
   const go = changes => { Object.assign(view, { dir: 0 }, changes); ctx.rerender(); };
   page.addEventListener('click', e => {
-    const el = e.target.closest('[data-unit], [data-chart], [data-flow], [data-step], [data-bucket], [data-group], [data-cat], [data-act="clear"], [data-tx]');
+    const el = e.target.closest('[data-unit], [data-chart], [data-flow], [data-sort], [data-step], [data-bucket], [data-group], [data-cat], [data-act="clear"], [data-tx]');
     if (!el) return;
     const d = el.dataset;
     if (d.unit) { if (d.unit !== view.unit) go({ unit: d.unit, offset: 0, bucket: null }); }
+    else if (d.sort) { if (d.sort !== view.sort) go({ sort: d.sort }); }
     else if (d.chart) { if (d.chart !== view.chart) go({ chart: d.chart, bucket: null, group: null, cat: null }); }
     else if (d.flow) { if (d.flow !== view.flow) go({ flow: d.flow, bucket: null }); }
     else if (d.step) step(+d.step);
@@ -186,4 +231,5 @@ export function mount(root, ctx) {
 
 export function after(root) {
   animatePie(root);
+  liftValue(root);
 }
