@@ -284,6 +284,12 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
 .sheet .field { margin: 0; }
 .field input { font: inherit; font-size: 16px; color: var(--ink); background: var(--soft); border: 1px solid transparent; border-radius: 14px; padding: 12px 14px; width: 100%; }
 .field input:focus { outline: none; border-color: var(--accent); }
+/* iPhone の Safari の日付の欄：そのままだと幅（100%）を無視して長い日付が入る幅で描かれ、欄からはみ出し、日付も真ん中に寄る。
+   Safari 独自の見た目を外して、ほかの文字の欄にそろえる（押すと日付を選ぶ画面が出るのは変わらない）。
+   10/6 本人の iPhone で起きた。直し方は jwatte.com「Why iPhone Date Fields Stick Out…」と logfetch.com の記事で確認 */
+.field { min-width: 0; }
+input[type="date"] { -webkit-appearance: none; appearance: none; display: block; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; text-align: left; }
+input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 1.5em; min-height: 1lh; }
 .field-row { display: flex; gap: 10px; margin-top: 12px; }
 .field-row .grow { flex: 1; }
 .amount-input { display: flex; align-items: baseline; justify-content: center; gap: 6px; padding: 14px; background: var(--soft); border-radius: 20px; }
