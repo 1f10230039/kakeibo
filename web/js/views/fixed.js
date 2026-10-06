@@ -1,12 +1,11 @@
 // S-12 固定費（10/7 本人）。今月の固定費（見込み）と先月との差、月ごとの推移、今月まだ来ていないもの、店（サブスク）ごとの一覧。
 // 固定費＝グループが「固定費」のカテゴリ（いまはサブスク・通信費）。月は利用日で数える（ほかの画面と同じ）。計算は calc.js の fixedSummary。
-// ホームの「固定費」のカードと、メニューから開く。行を押すと、いちばん新しい利用の詳細が開く。
-// 棒グラフの下は、選んだ月で変わる（10/7 本人）：前の月はその月の一覧だけ。今月（初め）は、今月の一覧＋まだ来ていないもの＋いまの固定費。
+// ホームの「固定費」のカードと、メニューから開く。行を押すと、その利用の詳細が開く（「まだ」の行は、その店のいちばん新しい利用）。
+// 棒グラフの下は、選んだ月の「◯月の固定費」の一覧1つだけ（10/7 本人）。今月は、もう来たものとまだ来ていないものを日にちの順に混ぜて出す。
 // パッと見の情報を減らすため、出し方の説明は ⓘ に入れる。
 
 import * as C from '../calc.js';
 import { esc, money, icon, iconMark, liftValue, info } from '../ui.js';
-import { row } from './home.js';
 
 let pick = null; // タップして選んだ月（'YYYY-MM'）。null なら選んでいない（下は今月のもの）
 let live = null; // 書き換えたあとも、いまの ctx でシートを開くため
@@ -16,8 +15,7 @@ export const morphable = true;
 /** 固定費の出し方（ホームのカードと、この画面の ⓘ）。 */
 export const FIXED_INFO = cats => `カテゴリのグループが「固定費」（${cats.join('・')}）の支出を、利用日の月で数えます。\n今月の金額は、もう来た分に、先月来たのに今月まだ来ていないもの（先月と同じ金額）を足した見込みです。`;
 
-const PENDING_INFO = '先月来たのに、今月まだ来ていないものです。「◯日ごろ」は先月来た日です。\n解約したものは、来月から出なくなります。年に1回のものも、払った次の月にここに出ることがあります。';
-const ITEMS_INFO = '今月か先月に来た店です。金額は、今月分がそろっていれば今月、まだなら先月の金額です。前の月から金額が変わったときは、その差も出します。\n行を押すと、いちばん新しい利用の詳細が開きます。';
+const CURRENT_INFO = 'もう来たものと、まだ来ていないものを、日にちの順に並べています。\n「まだ」は、先月来たのに今月まだ来ていないものです。「◯日ごろ」は先月来た日で、金額も先月の金額です。その日を過ぎても来ていなければ、「まだ」が赤くなります。\n解約したものは、来月から出なくなります。年に1回のものも、払った次の月に「まだ」で出ることがあります。';
 
 export function render(ctx) {
   live = ctx;
@@ -45,27 +43,8 @@ export function render(ctx) {
       ${legend(f)}
     </section>
 
-    ${monthList(data.transactions, f, shown, hidden, names, shown === cur, today)}
-    ${shown === cur ? current(f, rest, hidden) : ''}
+    ${monthSection(data.transactions, f, shown, shown === cur, hidden, names, today)}
   </div>`;
-}
-
-/** 今月だけ：まだ来ていないもの・いまの固定費。 */
-function current(f, rest, hidden) {
-  return `${f.pending.length ? `<div class="section" data-key="pend-head"><h2>まだ来ていないもの${info(PENDING_INFO)}</h2><span class="more">${money(rest, hidden)}</span></div>
-      <div class="list card" data-key="pend">${f.pending.map(p => `<button class="row" data-key="p:${esc(p.key)}:${p.amount}" data-tx="${esc(p.lastId)}">
-        ${iconMark(p.category, C.FIXED_GROUP)}
-        <span class="t"><b><span class="cat-name">${esc(p.name)}</span></b><small>${p.day}日ごろ${p.late ? '<span class="badge warn">まだ</span>' : ''}</small></span>
-        <span class="a muted">${money(p.amount, hidden)}</span>
-      </button>`).join('')}</div>` : ''}
-
-    <div class="section" data-key="items-head"><h2>いまの固定費${info(ITEMS_INFO)}</h2>${f.items.length ? `<span class="more">毎月 ${money(C.sum(f.items), hidden)} ほど</span>` : ''}</div>
-    ${f.items.length ? `<div class="list card" data-key="items">${f.items.map(i => `<button class="row" data-key="i:${esc(i.key)}" data-tx="${esc(i.lastId)}">
-        ${iconMark(i.category, C.FIXED_GROUP)}
-        <span class="t"><b><span class="cat-name">${esc(i.name)}</span></b><small>毎月${i.days.join('・')}日ごろ</small></span>
-        <span class="a">${money(i.amount, hidden)}${i.change && !hidden ? `<small class="chg ${i.change > 0 ? 'up' : 'down'}">${i.change > 0 ? '+' : '−'}${esc(C.yen(Math.abs(i.change)))}</small>` : ''}</span>
-      </button>`).join('')}</div>`
-      : '<p class="empty" data-key="items">今月と先月の固定費はありません</p>'}`;
 }
 
 /** 月ごとの棒グラフ。カテゴリ（サブスク・通信費）で色を分けて積み上げ、今月はまだ来ていない分を斜線で足す。 */
@@ -97,13 +76,41 @@ function legend(f) {
   return `<div class="bar-legend" data-key="legend">${used.map(c => `<span data-key="${esc(c)}"><i class="part f${Math.min(f.cats.indexOf(c), 2)}"></i>${esc(c)}</span>`).join('')}${exp ? '<span data-key="exp"><i class="part exp"></i>まだ来ていない分</span>' : ''}</div>`;
 }
 
-/** 選んだ月の固定費の一覧（新しい順）。今月は、もう来た分。 */
-function monthList(txs, f, month, hidden, names, isCurrent, today) {
-  const list = C.newestFirst(txs.filter(t => C.isSpend(t) && f.cats.includes(t.category) && t.date.slice(0, 7) === month && t.date <= C.ymd(today)));
+/**
+ * 選んだ月の「◯月の固定費」。1行＝1回の利用。名前が先、下に日付。
+ * 今月は、まだ来ていないもの（先月の分）も同じ一覧に入れて、月の日にちの順に並べる（来たものが先）。見出しの右は今月の見込み。
+ * 前の月は、その月に来たものを日にちの順に。
+ */
+function monthSection(txs, f, month, isCurrent, hidden, names, today) {
+  const todayStr = C.ymd(today);
+  const came = txs.filter(t => C.isSpend(t) && f.cats.includes(t.category) && t.date.slice(0, 7) === month && t.date <= todayStr);
+  // 値段が変わった印：今月そろった店で、今月1回だけのもの
+  const changeOf = new Map(isCurrent ? f.items.filter(i => i.arrived && i.change && i.days.length === 1).map(i => [i.key, i.change]) : []);
+  const entries = [
+    ...came.map(t => ({ day: Number(t.date.slice(8, 10)), order: 0, t })),
+    ...(isCurrent ? f.pending.map(p => ({ day: p.day, order: 1, p })) : []),
+  ].sort((a, b) => a.day - b.day || a.order - b.order || (a.t && b.t ? (a.t.id < b.t.id ? -1 : 1) : 0));
+  const total = isCurrent ? f.forecast : C.sum(came);
   const m = Number(month.slice(5));
-  return `<div class="section" data-key="md-head:${month}"><h2>${m}月${isCurrent ? 'に来た分' : 'の固定費'}</h2><span class="more">${money(C.sum(list), hidden)}</span></div>
-    ${list.length ? `<div class="list card" data-key="md:${month}">${list.map(t => row(t, C.FIXED_GROUP, hidden, C.subtitleOf(t, names))).join('')}</div>`
-      : `<p class="empty" data-key="md:${month}">${isCurrent ? '今月はまだ来ていません' : 'この月の固定費はありません'}</p>`}`;
+  const rowHtml = e => {
+    if (e.t) {
+      const t = e.t, change = changeOf.get(C.fixedKey(t));
+      return `<button class="row" data-key="t:${esc(t.id)}" data-tx="${esc(t.id)}">
+        ${iconMark(t.category, C.FIXED_GROUP)}
+        <span class="t"><b><span class="cat-name">${esc(C.fixedName(t, names))}</span></b><small>${m}/${e.day}</small></span>
+        <span class="a">${money(t.amount, hidden)}${change && !hidden ? `<small class="chg ${change > 0 ? 'up' : 'down'}">${change > 0 ? '+' : '−'}${esc(C.yen(Math.abs(change)))}</small>` : ''}</span>
+      </button>`;
+    }
+    const p = e.p;
+    return `<button class="row yet" data-key="p:${esc(p.key)}:${p.amount}" data-tx="${esc(p.lastId)}">
+        ${iconMark(p.category, C.FIXED_GROUP)}
+        <span class="t"><b><span class="cat-name">${esc(p.name)}</span></b><small>${p.day}日ごろ<span class="badge${p.late ? ' warn' : ''}">まだ</span></small></span>
+        <span class="a muted">${money(p.amount, hidden)}</span>
+      </button>`;
+  };
+  return `<div class="section" data-key="md-head:${month}"><h2>${m}月の固定費${isCurrent ? info(CURRENT_INFO) : ''}</h2><span class="more">${isCurrent && f.pending.length ? '見込み ' : ''}${money(total, hidden)}</span></div>
+    ${entries.length ? `<div class="list card" data-key="md:${month}">${entries.map(rowHtml).join('')}</div>`
+      : `<p class="empty" data-key="md:${month}">${isCurrent ? '今月の固定費はまだありません' : 'この月の固定費はありません'}</p>`}`;
 }
 
 export function mount(root) {

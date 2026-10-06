@@ -460,7 +460,8 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 .badge.warn { color: var(--warn); border-color: var(--warn); }
 .row .a small.chg { display: block; font-family: var(--font-body); font-size: 10px; text-align: right; color: var(--ink2); }
 .row .a small.chg.up { color: var(--warn); }
-.fixed-note { margin: 8px 24px 0; }
+/* まだ来ていない行：印と金額を薄くして、もう来た行と見分ける */
+.row.yet .mark { opacity: .5; }
 
 /* ---- CSV の照合（S-09） ---- */
 .file-btn { cursor: pointer; }

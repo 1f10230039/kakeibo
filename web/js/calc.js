@@ -397,6 +397,16 @@ export function fixedCategories(categories) {
   return categories.filter(c => c.group === FIXED_GROUP).map(c => c.name);
 }
 
+/** 固定費を店ごとにまとめるときの鍵：利用先（表記ゆれはそろえる）。利用先のない手入力は名前（メモ）かカテゴリ。 */
+export function fixedKey(t) {
+  return t.merchant ? 'm:' + normalizeMerchant(t.merchant) : 'h:' + (t.memo || t.category);
+}
+
+/** 固定費の1件の名前：店の表示名 → この行の名前 → 利用先 → カテゴリ。 */
+export function fixedName(t, names) {
+  return (t.merchant && names.get(normalizeMerchant(t.merchant))) || t.memo || t.merchant || t.category;
+}
+
 /** 'YYYY-MM' を n か月ずらす。 */
 export function addMonths(month, n) {
   return ym(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + n, 1));
@@ -422,7 +432,7 @@ export function fixedSummary(txs, categories, rules, today, n = 12) {
   // 店ごとにまとめる
   const byItem = new Map();
   list.forEach(t => {
-    const key = t.merchant ? 'm:' + normalizeMerchant(t.merchant) : 'h:' + (t.memo || t.category);
+    const key = fixedKey(t);
     if (!byItem.has(key)) byItem.set(key, { key, merchant: t.merchant || '', charges: [] });
     byItem.get(key).charges.push(t);
   });
