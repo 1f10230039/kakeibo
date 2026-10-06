@@ -139,6 +139,67 @@ export function addClearButtons(root) {
   });
 }
 
+// ---- ⓘ（説明の吹き出し） ----
+// 画面にはパッと見て分かることだけを置き、出し方などの説明は ⓘ を押したときだけ出す（10/7 本人）。
+// 吹き出しは #app の外（body）に出すので、画面を書き換えても消えない。シートの中でも使える（シートは閉じない）。
+
+/** ⓘ のボタン。text は押したときに出す説明。 */
+export function info(text, label = '説明を見る') {
+  return `<button type="button" class="info" data-info="${esc(text)}" aria-label="${esc(label)}" aria-expanded="false">${UI_ICON.info}</button>`;
+}
+
+let tipEl = null, tipFor = null;
+
+function closeTip() {
+  if (!tipEl) return;
+  const el = tipEl;
+  tipFor?.setAttribute('aria-expanded', 'false');
+  tipEl = tipFor = null;
+  el.classList.remove('show');
+  setTimeout(() => el.remove(), 200);
+}
+
+/** ボタンのすぐ下（下に場所がなければ上）に置き、画面の左右からはみ出さないようにする。 */
+function placeTip(el, btn) {
+  const r = btn.getBoundingClientRect(), w = Math.min(280, window.innerWidth - 32);
+  el.style.width = w + 'px';
+  const left = Math.min(window.innerWidth - 16 - w, Math.max(16, r.left + r.width / 2 - w / 2));
+  el.style.left = left + 'px';
+  el.style.setProperty('--arrow', `${Math.round(r.left + r.width / 2 - left)}px`);
+  const h = el.offsetHeight;
+  const below = r.bottom + 8 + h < window.innerHeight - 100; // 下のタブバーにかからないか
+  el.classList.toggle('above', !below);
+  el.style.top = (below ? r.bottom + 8 : r.top - 8 - h) + 'px';
+}
+
+// 押したところで受け取る（カードのリンクや行のボタンより先に。ⓘ を押してもそちらは動かない）
+document.addEventListener('click', e => {
+  const btn = e.target.closest?.('[data-info]');
+  if (!btn) {
+    if (tipEl && !e.target.closest?.('.info-tip')) closeTip();
+    return;
+  }
+  e.preventDefault();
+  e.stopPropagation();
+  if (tipFor === btn) { closeTip(); return; }
+  closeTip();
+  const el = document.createElement('div');
+  el.className = 'info-tip';
+  el.setAttribute('role', 'tooltip');
+  el.textContent = btn.dataset.info;
+  document.body.appendChild(el);
+  placeTip(el, btn);
+  void el.offsetHeight;
+  el.classList.add('show');
+  btn.setAttribute('aria-expanded', 'true');
+  tipEl = el;
+  tipFor = btn;
+}, true);
+window.addEventListener('scroll', closeTip, { capture: true, passive: true }); // シートの中のスクロールでも閉じる
+window.addEventListener('resize', closeTip);
+window.addEventListener('hashchange', closeTip);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTip(); });
+
 // ---- お知らせ（画面の下に少し出る） ----
 
 export function toast(text, kind = '') {

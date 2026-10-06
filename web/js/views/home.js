@@ -3,8 +3,9 @@
 
 import * as C from '../calc.js';
 import { CATEGORY_PHOTO, categoryIcon } from '../icons.js';
-import { esc, money, signedMoney, iconMark, icon, seg } from '../ui.js';
+import { esc, money, signedMoney, iconMark, icon, seg, info } from '../ui.js';
 import { meter } from './budget.js';
+import { FIXED_INFO } from './fixed.js';
 
 let topRange = 'month'; // 支出トップの期間：'month'（今月。初めはこちら・10/6 本人）／'week'（今週）
 
@@ -61,17 +62,18 @@ export function render(ctx) {
       <div class="pair">
         <a class="mini card" href="#/income"><div class="label">収入</div>
           <div class="num">${hasIncome ? money(C.monthIncome(txs, today), hidden) : '<span class="muted">—</span>'}</div>
-          <div class="soon">${hasIncome ? '今月の入金' : '記録すると出ます'}</div></a>
-        <a class="mini card" href="#/assets"><div class="label">残高</div>
+          ${hasIncome ? '' : '<div class="soon">記録すると出ます</div>'}</a>
+        <div class="mini card linked"><a class="cover" href="#/assets" aria-label="資産の画面へ"></a>
+          <div class="label">残高${info('楽天銀行の残高（資産の画面で記録した、いちばん新しい額）から、記録した日のあと〜次の引き落とし日までのカード代を引いた額です。記録のあとの入金や、カード以外の出入りは入っていません。', '残高の出し方')}</div>
           <div class="num">${sp ? signedMoney(sp.amount, hidden) : '<span class="muted">—</span>'}</div>
-          <div class="soon">${sp ? 'カード代を引いた額' : '資産を記録すると出ます'}</div>
-          ${assetsNow ? `<div class="asset-total">資産の合計 ${money(assetsNow.total, hidden)}</div>` : ''}</a>
+          ${sp ? '' : '<div class="soon">資産を記録すると出ます</div>'}
+          ${assetsNow ? `<div class="asset-total">資産の合計 ${money(assetsNow.total, hidden)}</div>` : ''}</div>
       </div>
 
-      <a class="fixed-mini card" href="#/fixed" aria-label="固定費の画面へ">
-        <span><span class="label">固定費</span><small>${hasFixed ? `今月の見込み・先月 ${money(fixed.lastMonth, hidden)}` : `${esc(fixed.cats.join('・'))}のカテゴリを付けると出ます`}</small></span>
+      <div class="fixed-mini card linked"><a class="cover" href="#/fixed" aria-label="固定費の画面へ"></a>
+        <span class="label">固定費${info(FIXED_INFO(fixed.cats), '固定費の出し方')}</span>
         <span class="num">${hasFixed ? money(fixed.forecast, hidden) : '<span class="muted">—</span>'}</span>${icon('chevron')}
-      </a>
+      </div>
 
       <div class="due"><span>${esc(C.mdw(debit.date))} 引き落とし予定</span><span class="num">${money(debit.amount, hidden)}</span></div>
 

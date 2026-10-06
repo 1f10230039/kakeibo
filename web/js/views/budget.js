@@ -4,7 +4,7 @@
 
 import * as C from '../calc.js';
 import * as api from '../api.js';
-import { esc, money, openSheet, toast, icon, bindAmountInput, amountOf, busy } from '../ui.js';
+import { info, esc, money, openSheet, toast, icon, bindAmountInput, amountOf, busy } from '../ui.js';
 
 export const morphable = true;
 
@@ -47,9 +47,9 @@ function main(s, m, hidden) {
       <div class="meter-note"><span class="pace-mark"></span>今日までの目安</div>
     </section>
     <div class="pair">
-      <div class="mini card"><div class="label">1日あたり</div><div class="num">${s.over ? '—' : money(s.perDay, hidden)}</div>
-        <div class="soon">今日を入れて あと${s.daysLeft}日</div></div>
-      <div class="mini card"><div class="label">今日までの目安</div><div class="num">${money(s.pace, hidden)}</div>
+      <div class="mini card"><div class="label">1日あたり${info('予算の残りを、今日を入れた残りの日数で割った額です。毎日これくらいまでなら、予算の中で収まります。', '1日あたりの出し方')}</div><div class="num">${s.over ? '—' : money(s.perDay, hidden)}</div>
+        <div class="soon">あと${s.daysLeft}日</div></div>
+      <div class="mini card"><div class="label">今日までの目安${info('予算 × 今日までの日数 ÷ その月の日数 です。使った額がこれより少なければ、予算の中で収まるペースです。上の横棒の縦線も同じ目安です。', '目安の出し方')}</div><div class="num">${money(s.pace, hidden)}</div>
         <div class="soon">${esc(vsPace)}</div></div>
     </div>`;
 }
@@ -82,9 +82,7 @@ function openEditor(ctx, month) {
   const m = month ? Number(month.slice(5)) : 0;
   const title = month ? `${m}月だけの予算` : '毎月の予算';
   openSheet(`
-    <h2 class="sheet-title">${esc(title)}</h2>
-    <p class="sheet-note">${month ? `${m}月だけ、毎月の予算の代わりにこの金額を使います。` : '月ごとに決めていない月は、この金額を使います。'}
-      数えるのは、カードと手入力の支出です（利用日がその月のもの）。</p>
+    <h2 class="sheet-title">${esc(title)}${info(`${month ? `${m}月だけ、毎月の予算の代わりにこの金額を使います。` : '月ごとに決めていない月は、この金額を使います。'}\n数えるのは、カードと手入力の支出です（利用日がその月のもの）。`)}</h2>
     <label class="amount-input"><span>¥</span><input id="amount" inputmode="numeric" pattern="[0-9]*" placeholder="0" autocomplete="off" aria-label="予算の金額" value="${now ? now.amount : ''}"></label>
     <button class="btn primary wide" data-act="save">保存する</button>
     ${now ? `<div class="sheet-actions"><button class="btn danger" data-act="remove">${month ? `${m}月だけの予算をやめる（毎月の予算に戻す）` : '毎月の予算をなくす'}</button></div>` : ''}

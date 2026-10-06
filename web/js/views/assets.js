@@ -4,7 +4,7 @@
 
 import * as C from '../calc.js';
 import * as api from '../api.js';
-import { esc, money, signedMoney, openSheet, toast, icon, bindAmountInput, amountOf, busy } from '../ui.js';
+import { info, esc, money, signedMoney, openSheet, toast, icon, bindAmountInput, amountOf, busy } from '../ui.js';
 
 export const morphable = true;
 
@@ -91,13 +91,12 @@ function lineChart(points, hidden) {
 /** ホームの「残高」の中身：楽天銀行の記録 − 記録のあとの引き落とし。 */
 function spendCard(sp, hidden) {
   return `<section class="card asset-spend">
-    <div class="label">残高（ホームに出る額）</div>
+    <div class="label">残高（ホームに出る額）${info('楽天銀行の記録から、記録した日のあと〜次の引き落とし日までのカード代を引いた額です。\n記録した日のあとの入金（バイト代など）や、カード以外の出入りは入っていません。', '残高の出し方')}</div>
     <div class="spend-lines">
       <div><span>楽天銀行（${esc(C.mdw(C.parseYmd(sp.bankDate)))} の記録）</span>${money(sp.bankAmount, hidden)}</div>
       ${sp.debits.map(d => `<div><span>− ${esc(C.mdw(d.date))} の引き落とし</span>${money(d.amount, hidden)}</div>`).join('')}
       <div class="sum"><span>カード代を引いた額</span>${signedMoney(sp.amount, hidden)}</div>
     </div>
-    <p class="note-s">記録した日のあとの入金（バイト代など）や、カード以外の出入りは入っていません。</p>
   </section>`;
 }
 
@@ -130,8 +129,7 @@ export function openAssetSheet(ctx, { date, edit = false } = {}) {
       <label class="amount-input small"><span>¥</span><input id="${id}" inputmode="numeric" pattern="[0-9]*" placeholder="0" autocomplete="off" aria-label="${label}"></label>
       <div class="before" data-before="${id}"></div></div>`;
   openSheet(`
-    <h2 class="sheet-title">${edit ? `${esc(C.mdw(C.parseYmd(day)))} の記録` : '資産を記録する'}</h2>
-    <p class="sheet-note">楽天銀行のアプリと楽天証券の画面を見て、金額を写します。入れなかった項目は、前の記録の金額のまま数えます。</p>
+    <h2 class="sheet-title">${edit ? `${esc(C.mdw(C.parseYmd(day)))} の記録` : '資産を記録する'}${info('楽天銀行のアプリと楽天証券の画面を見て、金額を写します。入れなかった項目は、前の記録の金額のまま数えます。')}</h2>
     ${edit ? '' : `<label class="field"><span>記録日</span><input id="date" type="date" value="${day}" max="${today}"></label>`}
     ${field('bank', '楽天銀行の残高')}
     ${field('nisa', '楽天証券 NISA の評価額')}

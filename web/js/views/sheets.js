@@ -2,7 +2,7 @@
 
 import * as C from '../calc.js';
 import * as api from '../api.js';
-import { esc, money, iconMark, incomeMark, openSheet, toast, icon, seg, selectSeg, bindAmountInput, amountOf, busy } from '../ui.js';
+import { info, esc, money, iconMark, incomeMark, openSheet, toast, icon, seg, selectSeg, bindAmountInput, amountOf, busy } from '../ui.js';
 
 /** カテゴリをグループごとに並べたボタン。 */
 export function categoryPicker(categories, selected) {
@@ -60,11 +60,11 @@ export function openDetail(ctx, id) {
       <div><dt>状態</dt><dd>${esc(t.status)}</dd></div>
       ${t.payMonth ? `<div><dt>支払月</dt><dd>${esc(t.payMonth.replace('-', '年'))}月${t.status === '速報' ? '（仮）' : ''}</dd></div>` : ''}
     </dl>
-    ${canRule ? `<label class="switch-row"><span>この店はいつもこの内容<small>カテゴリと名前を「${esc(t.merchant)}」の他の利用にもまとめて付けます</small></span>
+    ${canRule ? `<label class="switch-row"><span>この店はいつもこの内容${info(`オンにすると、カテゴリと名前を対応表に入れて、「${t.merchant}」のほかの利用にもまとめて付けます。\nオフなら、この1件だけ変えます。`)}</span>
       <input type="checkbox" id="always" ${alwaysOn ? 'checked' : ''}><span class="switch" aria-hidden="true"></span></label>` : ''}
     <div class="sheet-label">カテゴリ</div>
     ${categoryPicker(ctx.data.categories, t.category)}
-    <div class="sheet-label">名前（一覧で用途の横に出ます。なくてもよい）</div>
+    <div class="sheet-label">名前${info('一覧で用途の横に出る名前です（例：サブスク　YouTube Premium）。なくてもかまいません。')}</div>
     <div class="name-row"><input id="name" data-clear maxlength="100" autocomplete="off" enterkeyhint="done" placeholder="例：YouTube Premium" value="${esc(t.memo || ruleName)}"></div>
     <button class="btn primary wide" data-act="save">保存</button>
     <div class="sheet-actions">
@@ -166,8 +166,7 @@ export function openManual(ctx, kind = '支出') {
     '収入': { title: '収入を記録する', note: '楽天銀行への入金（バイト代・お小遣いなど）を足します。名前を付けると、一覧で区別できます。', label: '名前（バイト代など）', ph: '例：バイト代', done: ' の収入を記録しました' },
   };
   openSheet(`
-    <div class="manual-head"><h2 class="sheet-title" data-text="title"></h2>${seg('kind', [['支出', '支出'], ['収入', '収入']], kind, '記録の種類')}</div>
-    <p class="sheet-note" data-text="note"></p>
+    <div class="manual-head"><h2 class="sheet-title"><span data-text="title"></span>${info('', '説明を見る')}</h2>${seg('kind', [['支出', '支出'], ['収入', '収入']], kind, '記録の種類')}</div>
     <label class="amount-input"><span>¥</span><input id="amount" inputmode="numeric" pattern="[0-9]*" placeholder="0" autocomplete="off" aria-label="金額"></label>
     <div class="field-row">
       <label class="field"><span>日付</span><input id="date" type="date" value="${C.ymd(ctx.today)}" max="${C.ymd(ctx.today)}"></label>
@@ -183,6 +182,7 @@ export function openManual(ctx, kind = '支出') {
     const apply = () => {
       sheet.dataset.kind = kind;
       sheet.querySelectorAll('[data-text]').forEach(el => { el.textContent = TEXT[kind][el.dataset.text]; });
+      sheet.querySelector('.manual-head [data-info]').dataset.info = TEXT[kind].note; // ⓘ の説明も、支出／収入で変える
       memoEl.placeholder = TEXT[kind].ph;
     };
     apply();

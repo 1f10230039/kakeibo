@@ -2,7 +2,7 @@
 
 import * as C from '../calc.js';
 import * as api from '../api.js';
-import { esc, money, icon, toast, seg, selectSeg, busy } from '../ui.js';
+import { info, esc, money, icon, toast, seg, selectSeg, busy } from '../ui.js';
 import { categoryPicker, openDetail, saveTx } from './sheets.js';
 import { row } from './home.js';
 
@@ -61,8 +61,8 @@ export const unclassified = {
         <div class="big">${money(t.amount, ctx.hidden)}</div>
         <div class="compare">${esc(C.mdw(C.parseYmd(t.date)))}・${esc(t.status)}</div>
       </section>
-      ${t.merchant ? `<label class="switch-row"><span>この店はいつもこの内容<small>次からはカテゴリと名前を自動で付けます</small></span><input type="checkbox" id="always" checked><span class="switch" aria-hidden="true"></span></label>` : ''}
-      <label class="field"><span>名前（一覧で用途の横に出ます。なくてもよい）</span><input id="name" data-clear maxlength="100" autocomplete="off" placeholder="例：YouTube Premium" value="${esc(t.memo)}"></label>
+      ${t.merchant ? `<label class="switch-row"><span>この店はいつもこの内容${info('オンにすると、カテゴリと名前を対応表に入れて、次からこの店の利用に自動で付けます。オフなら、この1件だけです。')}</span><input type="checkbox" id="always" checked><span class="switch" aria-hidden="true"></span></label>` : ''}
+      <label class="field"><span>名前${info('一覧で用途の横に出る名前です（例：サブスク　YouTube Premium）。なくてもかまいません。')}</span><input id="name" data-clear maxlength="100" autocomplete="off" placeholder="例：YouTube Premium" value="${esc(t.memo)}"></label>
       ${categoryPicker(ctx.data.categories, '')}
       <button class="btn ghost wide" data-act="skip">あとで決める</button>
     </div>`;
@@ -88,7 +88,7 @@ export const stale = {
   render(ctx) {
     const items = C.newestFirst(C.staleSokuho(ctx.data.transactions, ctx.today));
     return `<div class="page">${backBar('確認が必要な速報')}
-      <p class="lead">速報のメールが来てから14日たっても、確定のメールが来ていない利用です。キャンセルになったか、確定で金額が変わった可能性があります。タップして、キャンセルだったものは取り消してください。</p>
+      <p class="lead">14日たっても確定のメールが来ていない速報です${info('キャンセルになったか、確定で金額が変わった可能性があります。タップして、キャンセルだったものは取り消してください。')}</p>
       ${items.length ? `<div class="list card">${items.map(t => row(t, '未分類', ctx.hidden)).join('')}</div>` : '<p class="empty">ありません</p>'}
     </div>`;
   },
@@ -155,7 +155,7 @@ export const rules = {
   render(ctx) {
     const list = [...ctx.data.rules].sort((a, b) => a.merchant.localeCompare(b.merchant));
     return `<div class="page">${backBar('カテゴリの対応表', '#/menu')}
-      <p class="lead">確定のメールの店名が、ここにあるカテゴリと名前に自動で振り分けられます。タップすると変えられます。</p>
+      <p class="lead">店ごとのカテゴリと名前です${info('確定のメールの店名が、ここにあるカテゴリと名前に自動で振り分けられます。タップすると変えられます。')}</p>
       ${list.length ? `<div class="list card">${list.map(r => `
         <button class="row link" data-merchant="${esc(r.merchant)}"><span class="t"><b>${esc(r.merchant)}</b><small>${esc(r.category)}${r.displayName ? '・' + esc(r.displayName) : ''}</small></span>${icon('chevron')}</button>
         ${editing === r.merchant ? `<div class="row-edit">

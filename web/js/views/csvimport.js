@@ -6,7 +6,7 @@
 import * as C from '../calc.js';
 import * as api from '../api.js';
 import * as V from '../csv.js';
-import { esc, money, icon, toast, busy } from '../ui.js';
+import { info, esc, money, icon, toast, busy } from '../ui.js';
 
 const state = { parsed: null, error: '', picks: new Map() }; // picks：'a:何行目' / 'c:id' → チェックしたか（決めていなければ初めの値）
 
@@ -15,7 +15,7 @@ const isPicked = (key, initial) => (state.picks.has(key) ? state.picks.get(key) 
 export function render(ctx) {
   const { data, hidden } = ctx;
   const head = `<header class="page-head with-back"><a class="back" href="#/menu" aria-label="戻る">${icon('back')}</a><h1>CSV の照合</h1></header>
-    <p class="lead">パソコン版 e-NAVI の「ご利用明細」でダウンロードした明細の CSV を選びます。ファイルはこの端末の中だけで読み、チェックした行だけを記録します。</p>
+    <p class="lead">e-NAVI の明細の CSV を選びます${info('パソコン版 e-NAVI の「ご利用明細」でダウンロードした CSV です。ファイルはこの端末の中だけで読み、チェックした行だけを記録します。')}</p>
     <label class="btn wide file-btn">${icon('plus')}CSV を選ぶ<input type="file" id="csv-file" accept=".csv,text/csv"></label>
     ${state.error ? `<p class="note warn-text">${esc(state.error)}</p>` : ''}`;
   if (!state.parsed) return `<div class="page csv-page">${head}</div>`;
@@ -41,16 +41,14 @@ export function render(ctx) {
       ${p.skipped.length ? `<p class="note-s">本人以外の利用などの ${p.skipped.length}件は読みませんでした。</p>` : ''}
     </section>
     ${!addRows.length && !cancelRows.length ? '<p class="empty big">CSV とメールの記録は、全部一致しました 🎉</p>' : ''}
-    ${addRows.length ? `<div class="section"><h2>CSV にだけある利用</h2><span class="more">足す</span></div>
-      <p class="note">メールが届いていない・取り込めていない利用です。チェックしたものを記録します。</p>
+    ${addRows.length ? `<div class="section"><h2>CSV にだけある利用${info('メールが届いていない・取り込めていない利用です。チェックしたものを記録します。')}</h2><span class="more">足す</span></div>
       <div class="list card">${addRows.map(({ c, key }) => `
         <label class="row check-row" data-key="${key}">
           <input type="checkbox" data-pick-key="${key}" ${isPicked(key, true) ? 'checked' : ''}>
           <span class="t"><b>${esc(c.merchant || c.rawName)}</b><small>${esc(C.mdw(C.parseYmd(c.date)))}・${esc(rules.get(C.normalizeMerchant(c.merchant)) || '未分類')}</small></span>
           <span class="a">${money(c.amount, hidden)}</span>
         </label>`).join('')}</div>` : ''}
-    ${cancelRows.length ? `<div class="section"><h2>メールにだけある利用</h2><span class="more">キャンセルかも</span></div>
-      <p class="note">この月の支払い分なのに、明細に出てこない利用です。キャンセルになったものだけチェックして取り消します。</p>
+    ${cancelRows.length ? `<div class="section"><h2>メールにだけある利用${info('この月の支払い分なのに、明細に出てこない利用です。キャンセルになったものだけチェックして取り消します。')}</h2><span class="more">キャンセルかも</span></div>
       <div class="list card">${cancelRows.map(({ t, key }) => `
         <label class="row check-row" data-key="${key}">
           <input type="checkbox" data-pick-key="${key}" ${isPicked(key, false) ? 'checked' : ''}>
@@ -70,9 +68,8 @@ function totalsBlock(t, p, hidden) {
       <div><dt>明細の利用の合計</dt><dd>${money(t.use, hidden)}</dd></div>
       <div><dt>シートの${m}月払いの合計</dt><dd>${money(t.sheet, hidden)}${state}</dd></div>
       ${t.cancel ? `<div><dt>キャンセルなど ${p.cancels.length}件</dt><dd>−${money(t.cancel, hidden)}</dd></div>` : ''}
-      <div class="pay"><dt>差し引いた支払金額</dt><dd>${money(t.pay, hidden)}</dd></div>
-    </dl>
-    <p class="note-s">${t.cancel ? 'キャンセルなどの行は、元の利用と同じ金額とは限らないので、シートには入れません。' : ''}差し引いた支払金額は、e-NAVI の一覧の支払金額と同じになるはずです。違うときは、ポイントでの支払いなど、CSV に出てこないものがあるのかもしれません。</p>`;
+      <div class="pay"><dt>差し引いた支払金額${info(`${t.cancel ? 'キャンセルなどの行は、元の利用と同じ金額とは限らないので、シートには入れません。\n' : ''}差し引いた支払金額は、e-NAVI の一覧の支払金額と同じになるはずです。違うときは、ポイントでの支払いなど、CSV に出てこないものがあるのかもしれません。`)}</dt><dd>${money(t.pay, hidden)}</dd></div>
+    </dl>`;
 }
 
 export function mount(root, ctx) {
