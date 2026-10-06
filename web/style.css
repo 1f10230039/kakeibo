@@ -191,27 +191,44 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
 .chart { margin: 0 20px; padding: 18px 16px 12px; touch-action: pan-y; }
 .chart-total { display: flex; justify-content: space-between; align-items: baseline; padding: 0 6px 6px; }
 .chart-total .money { font-family: var(--font-num); font-weight: var(--num-weight); font-size: 28px; }
-/* 棒グラフ：棒の高さは --h（0〜1）。高さが変わると、前の高さから伸び縮みする（左から少しずつ遅れて） */
-.bars { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 12px; height: 206px; padding: 24px 2px 0; animation: chart-in .45s var(--ease) both; }
+/* 棒グラフ：棒の高さは --h（0〜1、縦の目盛りのいちばん上が 1）。高さが変わると、前の高さから伸び縮みする（左から少しずつ遅れて）
+   上の余白（--pt）は、選んだ棒の期間と金額の札が入る高さ。右の余白は縦の目盛りの金額の場所 */
+.bars { --pt: 40px; --lab: 16px; position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 12px; height: 222px;
+  padding: var(--pt) 38px 0 2px; animation: chart-in .45s var(--ease) both; }
 .bars.many { gap: 6px; }
-.bar { display: grid; grid-template-rows: 1fr auto; gap: 6px; min-width: 0; border-radius: 10px; }
+.bar { display: grid; grid-template-rows: 1fr var(--lab); gap: 6px; min-width: 0; border-radius: 10px; }
 .bar .col { position: relative; display: flex; flex-direction: column; justify-content: flex-end; }
-.bar .fill { height: calc(var(--h, 0) * 100%); border-radius: 10px; background: var(--bar);
-  transition: height .7s var(--ease) calc(var(--i, 0) * 28ms), background-color .3s; }
-.bar.on .fill { background: var(--accent); }
-/* 収入の棒：支出と同じ場所で、色だけ変える（切り替えると色も高さもなめらかに変わる） */
-.bars.income .fill { background: var(--income-bar); }
-.bars.income .bar.on .fill { background: var(--accent); }
+/* 棒の中は、グループの色を下から積み上げる（.part の --s はその棒の中での割合。flex-grow なので、割合が変わるとなめらかに動く） */
+.bar .fill { height: calc(var(--h, 0) * 100%); border-radius: 10px; background: var(--bar); overflow: hidden; display: flex; flex-direction: column-reverse;
+  transition: height .7s var(--ease) calc(var(--i, 0) * 28ms), opacity .3s; }
+.bar .part { flex: var(--s, 0) 1 0; min-height: 0; background: currentColor; transition: flex-grow .7s var(--ease) calc(var(--i, 0) * 28ms); }
+.bar .part.inc { color: var(--income-bar); }
+/* 棒を選んだら、ほかの棒を薄くする（円グラフと同じ見せ方） */
+.bars.picked .bar:not(.on) .fill { opacity: .32; }
 .chart-total .seg { font-size: 12px; }
 .bar:active .fill { filter: brightness(.94); }
-/* 選んだ棒の金額：棒より横に広いので、重なるとなりの棒のほうが高いときは、その上まで上げる（--lift は stats.js の liftValue）。棒より手前に描く */
+/* 縦の目盛り：棒の下の端（0円）から上へ。線は棒の後ろに描き、金額は右の余白に出す */
+.bars .grid { position: absolute; left: 2px; right: 0; top: var(--pt); bottom: calc(var(--lab) + 6px); pointer-events: none; }
+.tick { position: absolute; left: 0; right: 34px; bottom: calc(var(--y, 0) * 100%); border-top: 1px dashed var(--line); transition: bottom .7s var(--ease); animation: fade-in .4s var(--ease) both; }
+.tick i { position: absolute; left: calc(100% + 5px); top: 0; transform: translateY(-50%); font-style: normal; font-size: 10px; color: var(--ink2); font-family: var(--font-num); white-space: nowrap; }
+/* 選んだ棒の札（期間と金額）：棒より横に広いので、重なるとなりの棒のほうが高いときは、その上まで上げる（--lift は stats.js の liftValue）。棒より手前に描く */
 .bar .val { position: absolute; z-index: 1; left: 50%; bottom: calc(max(var(--h, 0), var(--lift, 0)) * 100% + 6px); transform: translateX(-50%); white-space: nowrap;
-  font-family: var(--font-num); font-weight: 600; font-size: 12px; transition: bottom .7s var(--ease); animation: pop-in .4s var(--spring) both; }
-.bar:first-child .val { left: 0; transform: none; }
-.bar:last-child .val { left: auto; right: 0; transform: none; }
-.bar .lab { font-size: 11px; color: var(--ink2); text-align: center; white-space: nowrap; transition: color .3s; }
+  display: grid; justify-items: center; line-height: 1.25; padding: 1px 4px; border-radius: 6px; background: var(--card); /* 目盛りの線が文字を通らないように */
+  transition: bottom .7s var(--ease); animation: pop-in .4s var(--spring) both; }
+.bar .val small { font-size: 10px; color: var(--ink2); }
+.bar .val b { font-family: var(--font-num); font-weight: 600; font-size: 12px; }
+.bar:first-of-type .val { left: 0; transform: none; justify-items: start; }
+.bar:last-of-type .val { left: auto; right: 0; transform: none; justify-items: end; }
+.bar .lab { font-size: 11px; line-height: var(--lab); color: var(--ink2); text-align: center; white-space: nowrap; transition: color .3s; }
 .bars.many .lab { font-size: 10px; letter-spacing: -.02em; }
 .bar.on .lab { color: var(--ink); }
+/* 月：下の文字は左端と右端の日付だけ（端に寄せる） */
+.bars.ends .bar:first-of-type .lab { text-align: left; }
+.bars.ends .bar:last-of-type .lab { text-align: right; }
+/* 色の見本 */
+.bar-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin-top: 12px; font-size: 11px; color: var(--ink2); animation: fade-in .4s var(--ease) both; }
+.bar-legend span { display: inline-flex; align-items: center; gap: 5px; animation: fade-in .4s var(--ease) both; }
+.bar-legend i { width: 8px; height: 8px; border-radius: 3px; background: currentColor; }
 /* 円グラフ：初めて出たときはぐるっと描かれ、期間を変えると割合が動く（stats.js の animatePie） */
 .pie-wrap { animation: chart-in .45s var(--ease) both; }
 .pie { display: grid; place-items: center; margin: 4px 0 10px; }

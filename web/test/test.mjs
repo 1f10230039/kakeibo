@@ -73,7 +73,8 @@ test('統計の期間：週は7本、月は週ごと（端は短い）、年は1
   assert.deepStrictEqual([C.ymd(w.start), C.ymd(w.end), w.buckets.length, w.buckets[0].label], ['2026-10-05', '2026-10-11', 7, '月']);
   const m = C.period('month', 0, D(2026, 10, 6), '月');
   // 2026年10月：1日(木)〜4日(日)、5〜11、12〜18、19〜25、26〜31
-  assert.deepStrictEqual(m.buckets.map(b => b.sub), ['1〜4日', '5〜11日', '12〜18日', '19〜25日', '26〜31日']);
+  assert.deepStrictEqual(m.buckets.map(b => b.sub), ['10/1〜10/4', '10/5〜10/11', '10/12〜10/18', '10/19〜10/25', '10/26〜10/31']);
+  assert.deepStrictEqual(m.buckets.map(b => b.label), ['10/1', '10/5', '10/12', '10/19', '10/26']);
   const y = C.period('year', -1, D(2026, 10, 6), '月');
   assert.deepStrictEqual([y.label, y.buckets.length, C.ymd(y.buckets[11].end)], ['2025年', 12, '2025-12-31']);
 });
@@ -86,6 +87,17 @@ test('棒ごとの合計', () => {
   const p = C.period('month', 0, D(2026, 10, 6), '月');
   const t = C.bucketTotals([tx('2026-10-02', 100), tx('2026-10-05', 200), tx('2026-10-31', 50)], p);
   assert.deepStrictEqual(t.map(b => b.total), [100, 200, 0, 0, 50]);
+});
+
+test('棒グラフの縦の目盛り：きりのいい金額で4本まで', () => {
+  const ax = m => { const a = C.niceAxis(m); return [a.top, a.ticks.map(C.axisYen).join(' ')]; };
+  assert.deepStrictEqual(ax(34060), [40000, '1万 2万 3万 4万']);
+  assert.deepStrictEqual(ax(12490), [15000, '5,000 1万 1.5万']);
+  assert.deepStrictEqual(ax(40000), [40000, '1万 2万 3万 4万']); // ちょうどのときは、いちばん上の線まで
+  assert.deepStrictEqual(ax(100000), [100000, '2.5万 5万 7.5万 10万']);
+  assert.deepStrictEqual(ax(4100), [6000, '2,000 4,000 6,000']);
+  assert.deepStrictEqual(ax(3), [3, '1 2 3']); // 1円より細かくしない
+  assert.deepStrictEqual(C.niceAxis(0), { top: 1, ticks: [] });
 });
 
 test('棒ごとの合計：収入に切り替えると入金だけ（取消は入れない）', () => {

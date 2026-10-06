@@ -4,6 +4,7 @@
 // 切り替えでは作り直さず、変わったところだけ書き換える（morphable）。棒は前の高さから新しい高さへ伸び縮みし、
 // 円は前の割合から新しい割合へ動く（初めて出たときは、ぐるっと描かれる）。
 // 一覧は日付順とカテゴリー別を切り替えられる（10/7 本人）。カテゴリー別は合計の多い順、収入の一覧では名前（バイト代など）ごと。
+// 棒グラフは、グループの色の積み上げ・右に縦の目盛り・月の横軸は端の日付だけ（10/7 本人）。
 
 import * as C from '../calc.js';
 import { GROUP_CLASS } from '../icons.js';
@@ -40,7 +41,7 @@ export function render(ctx) {
   if (view.chart === 'bar' && view.bucket !== null && p.buckets[view.bucket]) {
     const b = p.buckets[view.bucket];
     list = pick(list, b.start, b.end);
-    filterLabel = view.unit === 'week' ? `${b.sub}（${b.label}）` : view.unit === 'month' ? `${b.label}（${b.sub}）` : b.label;
+    filterLabel = detailOf(b) || b.label;
   }
   if (view.chart === 'pie' && view.cat) {
     list = list.filter(t => (t.category || '未分類') === view.cat);
@@ -67,7 +68,9 @@ export function render(ctx) {
       <section class="chart card" id="chart">
         ${view.chart === 'bar'
           ? `<div class="chart-total">${seg('flow', [['支出', '支出'], ['収入', '収入']], view.flow, 'グラフに出すもの')}${money(C.sum(showIncome ? incomesInPeriod : inPeriod), hidden, 'stats-total')}</div>
-             ${barChart(C.bucketTotals(data.transactions, p, view.flow), hidden, showIncome)}`
+             ${barChart(C.bucketTotals(data.transactions, p, view.flow), hidden, showIncome,
+               showIncome ? null : p.buckets.map(b => C.groupTotals(C.spendBetween(data.transactions, b.start, b.end), data.categories)))}
+             ${showIncome ? '' : barLegend(C.groupTotals(inPeriod, data.categories))}`
           : `<div class="chart-total"><span class="label">支出の合計</span>${money(C.sum(inPeriod), hidden, 'stats-total')}</div>
              ${incomesInPeriod.length ? `<div class="chart-income" data-key="inc"><span class="label">収入</span><span class="pos">+${money(C.sum(incomesInPeriod), hidden)}</span></div>` : ''}
              ${pieChart(C.groupTotals(inPeriod, data.categories), hidden)}`}
@@ -83,18 +86,48 @@ export function render(ctx) {
   </div>`;
 }
 
-/** 棒グラフ。高さは --h（0〜1）で、CSS が前の高さから新しい高さへ動かす。初めて出た棒は 0 から伸びる（data-from）。 */
-function barChart(buckets, hidden, income = false) {
-  const max = Math.max(1, ...buckets.map(b => b.total));
-  // 支出と収入で同じ data-key にして、切り替えると棒が今の高さから伸び縮みするようにする
-  return `<div class="bars${buckets.length > 7 ? ' many' : ''}${income ? ' income' : ''}" data-key="bar" role="group" aria-label="${income ? '収入' : '支出'}の棒グラフ">${buckets.map((b, i) => {
-    const h = b.total ? Math.max(0.035, b.total / max) : 0.012;
-    const on = view.bucket === i;
-    return `<button class="bar${on ? ' on' : ''}" data-bucket="${i}" aria-pressed="${on}" aria-label="${esc(b.label)} ${hidden ? '' : esc(C.yen(b.total))}">
-      <span class="col" data-vars="--h:${h.toFixed(4)};--i:${i}" data-from="--h:0">${on && !hidden ? `<span class="val" data-key="v">${esc(C.yen(b.total))}</span>` : ''}<span class="fill" data-key="f"></span></span>
-      <span class="lab">${esc(b.label)}</span>
+/** 棒をタップしたときに金額の上に出す期間（月は「9/8〜9/14」、週は「10/6（火）」。年は下の「9月」で分かるので出さない）。 */
+function detailOf(b) {
+  return view.unit === 'week' ? `${b.sub}（${b.label}）` : view.unit === 'month' ? b.sub : '';
+}
+
+/** 下の目盛りの文字：月は棒ごとに書くとくどいので、左端と右端の日付だけ（10/7 本人）。週は曜日、年は月。 */
+function axisLabel(buckets, i) {
+  if (view.unit !== 'month') return buckets[i].label;
+  const md = d => `${d.getMonth() + 1}/${d.getDate()}`;
+  return i === 0 ? md(buckets[0].start) : i === buckets.length - 1 ? md(buckets[i].end) : '';
+}
+
+/**
+ * 棒グラフ。高さは --h（0〜1、縦の目盛りのいちばん上が 1）で、CSS が前の高さから新しい高さへ動かす。初めて出た棒は 0 から伸びる（data-from）。
+ * 支出の棒は、円グラフと同じグループの色で積み上げる（10/7 本人）。下から 暮らし・固定費・たのしみ・その他・未分類。収入は1色。
+ * 棒を選ぶと、ほかの棒が薄くなり、選んだ棒の上に期間と金額が出る。
+ */
+function barChart(buckets, hidden, income, parts) {
+  const axis = C.niceAxis(Math.max(0, ...buckets.map(b => b.total)));
+  const picked = view.bucket !== null;
+  // 支出と収入で同じ data-key にして、切り替えると棒が今の高さから伸び縮みするようにする。目盛りは金額ごとの data-key で、上の金額が変わると線が動く
+  return `<div class="bars${buckets.length > 7 ? ' many' : ''}${income ? ' income' : ''}${view.unit === 'month' ? ' ends' : ''}${picked ? ' picked' : ''}" data-key="bar" role="group" aria-label="${income ? '収入' : '支出'}の棒グラフ">
+    <div class="grid" aria-hidden="true">${axis.ticks.map(v => `<span class="tick" data-key="t:${v}" data-vars="--y:${(v / axis.top).toFixed(4)}">${hidden ? '' : `<i>${esc(C.axisYen(v))}</i>`}</span>`).join('')}</div>
+    ${buckets.map((b, i) => {
+      const h = b.total ? Math.max(0.035, b.total / axis.top) : 0.012;
+      const on = view.bucket === i;
+      const detail = detailOf(b);
+      const segs = !b.total ? ''
+        : income ? '<span class="part inc" data-key="g:収入" data-vars="--s:1" data-from="--s:0"></span>'
+        : parts[i].map(g => `<span class="part ${GROUP_CLASS[g.group]}" data-key="g:${esc(g.group)}" data-vars="--s:${(g.total / b.total).toFixed(4)}" data-from="--s:0"></span>`).join('');
+      const tip = on && (detail || !hidden) ? `<span class="val" data-key="v">${detail ? `<small>${esc(detail)}</small>` : ''}${hidden ? '' : `<b>${esc(C.yen(b.total))}</b>`}</span>` : '';
+      return `<button class="bar${on ? ' on' : ''}" data-bucket="${i}" aria-pressed="${on}" aria-label="${esc(detail || b.label)} ${hidden ? '' : esc(C.yen(b.total))}">
+      <span class="col" data-vars="--h:${h.toFixed(4)};--i:${i}" data-from="--h:0">${tip}<span class="fill" data-key="f">${segs}</span></span>
+      <span class="lab">${esc(axisLabel(buckets, i))}</span>
     </button>`;
-  }).join('')}</div>`;
+    }).join('')}</div>`;
+}
+
+/** 棒の色の見本：この期間に使ったグループだけ。 */
+function barLegend(groups) {
+  if (!groups.length) return '';
+  return `<div class="bar-legend" data-key="legend">${groups.map(g => `<span data-key="${esc(g.group)}"><i class="${GROUP_CLASS[g.group]}"></i>${esc(g.group)}</span>`).join('')}</div>`;
 }
 
 const R = 70, L = 2 * Math.PI * R;

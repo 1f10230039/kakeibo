@@ -201,7 +201,9 @@ export function period(unit, offset, today, weekStart) {
     while (s <= end) {
       let e = addDays(startOfWeek(s, weekStart), 6);
       if (e > end) e = end;
-      buckets.push({ start: s, end: e, label: `${buckets.length + 1}週`, sub: `${s.getDate()}〜${e.getDate()}日` });
+      // 「第◯週」は分かりにくいので日付で出す（10/7 本人）：label は始まりの日、sub は期間（例：9/8〜9/14）
+      const md = d => `${d.getMonth() + 1}/${d.getDate()}`;
+      buckets.push({ start: s, end: e, label: md(s), sub: `${md(s)}〜${md(e)}` });
       s = addDays(e, 1);
     }
     return { unit, start, end, label: `${start.getFullYear()}年${start.getMonth() + 1}月`, buckets };
@@ -209,6 +211,23 @@ export function period(unit, offset, today, weekStart) {
   const y = today.getFullYear() + offset;
   const buckets = [...Array(12)].map((_, i) => ({ start: new Date(y, i, 1), end: new Date(y, i + 1, 0), label: `${i + 1}月`, sub: '' }));
   return { unit, start: new Date(y, 0, 1), end: new Date(y, 11, 31), label: `${y}年`, buckets };
+}
+
+/**
+ * 棒グラフの縦の目盛り（10/7 本人）：いちばん高い棒が入る、きりのいい金額の線を4本まで。
+ * 間隔は 1・2・2.5・5 ×10ⁿ 円から選ぶ（1円より細かくはしない）。棒の高さは top を 1 として描く。
+ */
+export function niceAxis(max) {
+  if (!(max > 0)) return { top: 1, ticks: [] };
+  const raw = max / 4, pow = Math.max(1, 10 ** Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * pow).find(s => s >= raw);
+  const n = Math.ceil(max / step);
+  return { top: n * step, ticks: [...Array(n)].map((_, i) => (i + 1) * step) };
+}
+
+/** 目盛りの金額：1万円からは「◯万」（例：2.5万）、それより下は「5,000」。 */
+export function axisYen(v) {
+  return v >= 10000 ? `${+(v / 10000).toFixed(2)}万` : v.toLocaleString('ja-JP');
 }
 
 /** 棒ごとの合計。kind：'支出'（初め）か '収入'（統計の切り替え・10/6）。 */
