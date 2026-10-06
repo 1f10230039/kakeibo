@@ -53,7 +53,7 @@ button, a { transition: scale .22s var(--ease), background-color .25s, color .25
 .tile:active { scale: .97; transition-duration: .1s; }
 :is(button, a).row:active, .legend-row:active { background-color: var(--soft); transition-duration: .05s; }
 svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.money, .big, .num, .amt, .a, .rank, .val { font-variant-numeric: lining-nums; }
+.money, .big, .num, .amt, .a, .rank, .val, .month b { font-variant-numeric: lining-nums; }
 
 /* どの画面でも、ページを画面より少しだけ長くして、いつもスクロールできる状態にする。
    iPhone のホーム画面アプリ（写真をステータスバーの下まで広げる設定）では、スクロールしないページのときだけ、
@@ -76,9 +76,12 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
 .hero::after { background: var(--hero-shade); }
 .top { position: absolute; z-index: 2; inset: 0 0 auto 0; display: flex; justify-content: space-between; align-items: flex-start;
   padding: calc(22px + env(safe-area-inset-top)) 22px 0; color: #fff; animation: fade-down .8s .15s var(--ease) both; }
-.month { font-family: var(--font-head); font-size: 15px; letter-spacing: .12em; opacity: .9; }
-.greet { font-family: var(--font-head); font-size: 21px; margin-top: 4px; letter-spacing: .04em; white-space: nowrap; text-shadow: 0 1px 12px rgba(0,0,0,.18); }
-.greet.long { font-size: 17px; }
+/* 「10月」：数字は大きく数字の書体で、「月」は少し小さく（10/7 本人：もっと大きく） */
+.month { font-family: var(--font-head); font-size: 20px; letter-spacing: .08em; line-height: 1; text-shadow: 0 1px 12px rgba(0,0,0,.18); }
+.month b { font-family: var(--font-num); font-weight: var(--num-weight); font-size: 48px; letter-spacing: .02em; margin-right: 3px; }
+[data-theme="b"] .month b { font-weight: 400; } /* 昼の数字（300）は、明るい写真の上だと細すぎる */
+/* 挨拶は右上のボタンより下に来るので、12文字（theme.js の決まり）でも 21px のまま1行に収まる（幅 320px の画面でも） */
+.greet { font-family: var(--font-head); font-size: 21px; margin-top: 8px; letter-spacing: .04em; white-space: nowrap; text-shadow: 0 1px 12px rgba(0,0,0,.18); }
 .icons { display: flex; gap: 10px; }
 .icon-btn { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.18);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; }
@@ -95,7 +98,13 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
 .due { margin: 12px 20px 0; padding: 14px 18px; border-radius: 18px; border: 1px solid var(--line); display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; }
 .due .num { font-family: var(--font-num); font-weight: var(--num-weight); font-size: 19px; }
 
-.todo { display: flex; gap: 8px; margin: 18px 20px 0; flex-wrap: wrap; align-items: center; }
+/* やること：ボタンをまとめて、テーマの色を少し混ぜた地の上に置き、周りと分ける（10/7 本人）。中のボタンはカードの色で浮かせる */
+.todo { display: flex; gap: 8px; margin: 16px 20px 0; padding: 12px; border-radius: 22px; flex-wrap: wrap; align-items: center;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
+.todo .chip:not(.primary) { background: var(--card); }
+/* 夜（C）は金を紺に混ぜると濁るので、カードより少し明るい地を金の細い線で囲む。中のボタンは地より明るく */
+[data-theme="c"] .todo { background: color-mix(in srgb, var(--accent) 9%, var(--card)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
+[data-theme="c"] .todo .chip:not(.primary) { background: color-mix(in srgb, #fff 13%, var(--card)); }
 .chip { font-size: 13px; padding: 9px 14px; border-radius: 16px; background: var(--soft); color: var(--ink); display: inline-flex; gap: 6px; align-items: center; }
 .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
 .chip.primary { background: var(--accent); color: var(--accent-ink); margin-left: auto; }

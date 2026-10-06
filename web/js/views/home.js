@@ -43,7 +43,7 @@ export function render(ctx) {
       <div class="hero">
         <div class="hero-img"></div>
         <div class="top">
-          <div><div class="month">${today.getMonth() + 1}月</div><div class="greet${look.greeting.length >= 9 ? ' long' : ''}">${esc(look.greeting)}</div></div>
+          <div><div class="month"><b>${today.getMonth() + 1}</b>月</div><div class="greet">${esc(look.greeting)}</div></div>
           <div class="icons">
             <button class="icon-btn" data-act="hide" aria-label="${hidden ? '金額を出す' : '金額を隠す'}">${icon(hidden ? 'eyeOff' : 'eye')}</button>
             <a class="icon-btn" href="#/menu" aria-label="メニュー">${icon('menu')}</a>

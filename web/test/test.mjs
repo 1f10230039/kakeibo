@@ -322,13 +322,57 @@ test('季節：3〜5月 春、6〜8月 夏、9〜11月 秋、12〜2月 冬', () 
   assert.deepStrictEqual([1, 2, 3, 5, 6, 8, 9, 11, 12].map(T.seasonOf), ['winter', 'winter', 'spring', 'spring', 'summer', 'summer', 'autumn', 'autumn', 'winter']);
 });
 
-test('時間帯と挨拶の境目', () => {
-  const cases = [[4, 'night', '遅くまでおつかれさまです'], [5, 'morning', 'おはようございます'], [9, 'morning', 'おはようございます'], [10, 'day', 'こんにちは'],
-    [15, 'day', 'こんにちは'], [16, 'evening', 'おつかれさまです'], [18, 'evening', 'おつかれさまです'], [19, 'night', 'こんばんは'], [22, 'night', 'こんばんは'], [23, 'night', '遅くまでおつかれさまです']];
+test('時間帯と挨拶の境目（挨拶はその時間帯の候補から）', () => {
+  const cases = [[4, 'night', 'late'], [5, 'morning', 'morning'], [9, 'morning', 'morning'], [10, 'day', 'day'],
+    [15, 'day', 'day'], [16, 'evening', 'evening'], [18, 'evening', 'evening'], [19, 'night', 'night'], [22, 'night', 'night'], [23, 'night', 'late']];
   cases.forEach(([h, slot, g]) => {
     assert.strictEqual(T.slotOf(h), slot, `${h}時`);
-    assert.strictEqual(T.greetingOf(h), g, `${h}時`);
+    const now = new Date(2026, 9, 7, h, 30); // 水曜（祝日でない）
+    const list = T.greetingCandidates(now);
+    assert.ok(list.includes(T.greetingOf(now)), `${h}時：${T.greetingOf(now)}`);
+    assert.ok(T.GREETINGS[g].every(s => list.includes(s)), `${h}時の候補`);
+    const others = Object.values(T.GREETINGS).flat().filter(s => !T.GREETINGS[g].includes(s));
+    assert.ok(!others.some(s => list.includes(s)), `${h}時に別の時間帯の挨拶が混ざる`);
   });
+});
+
+test('挨拶：同じ日の同じ時間帯は同じ、次の日は別のもの、何日かで全部の候補が出る', () => {
+  assert.strictEqual(T.greetingOf(new Date(2026, 9, 7, 6, 0)), T.greetingOf(new Date(2026, 9, 7, 9, 59)));
+  assert.strictEqual(T.greetingOf(new Date(2026, 9, 7, 23, 0)), T.greetingOf(new Date(2026, 9, 8, 4, 59)), '0〜5時は前の日の続き');
+  assert.notStrictEqual(T.greetingOf(new Date(2026, 9, 7, 6, 0)), T.greetingOf(new Date(2026, 9, 8, 6, 0)));
+  const seen = new Set();
+  for (let i = 0; i < 28; i++) seen.add(T.greetingOf(new Date(2026, 9, 5 + i, 7, 0)));
+  T.GREETINGS.morning.forEach(s => assert.ok(seen.has(s), s));
+});
+
+test('挨拶：曜日・休日・季節で候補が増える', () => {
+  const has = (d, s) => T.greetingCandidates(d).includes(s);
+  assert.ok(has(new Date(2026, 9, 5, 7), '今週もはじまりましたね'), '月曜の朝');
+  assert.ok(!has(new Date(2026, 9, 12, 7), '今週もはじまりましたね'), 'スポーツの日（月曜の祝日）は出さない');
+  assert.ok(has(new Date(2026, 9, 12, 7), 'よい休日を') && !has(new Date(2026, 9, 7, 7), 'よい休日を'), '祝日の朝だけ');
+  assert.ok(has(new Date(2026, 9, 9, 20), 'よい週末を') && has(new Date(2026, 9, 9, 17), '今週もおつかれさまでした'), '金曜の夕方・夜');
+  assert.ok(!has(new Date(2026, 9, 8, 20), 'よい週末を'), '木曜の夜は出さない');
+  assert.ok(has(new Date(2026, 9, 10, 1), 'そろそろ休みませんか') && !has(new Date(2026, 9, 10, 1), 'よい週末を'), '金曜の深夜は深夜の候補');
+  assert.ok(!has(new Date(2026, 9, 11, 20), '明日から平日ですね'), '日曜でも次の日が祝日なら出さない');
+  assert.ok(has(new Date(2026, 9, 12, 20), '明日から平日ですね'), '連休の最後の夜');
+  assert.ok(has(new Date(2026, 9, 7, 12), 'お昼、食べましたか？') && !has(new Date(2026, 9, 7, 15), 'お昼、食べましたか？'), 'お昼どき');
+  assert.ok(has(new Date(2026, 9, 7, 21), '秋の夜長ですね') && !has(new Date(2026, 6, 7, 21), '秋の夜長ですね'), '秋の夜');
+  assert.ok(has(new Date(2026, 0, 20, 7), '暖かくしてくださいね') && has(new Date(2026, 6, 20, 12), '水分とってくださいね'), '冬の朝・夏の昼');
+});
+
+test('挨拶：元日〜1/3・大晦日・月の1日は決まった挨拶', () => {
+  assert.strictEqual(T.greetingOf(new Date(2027, 0, 1, 0, 30)), '新年おめでとうございます');
+  assert.strictEqual(T.greetingOf(new Date(2027, 0, 3, 21)), '新年おめでとうございます');
+  assert.strictEqual(T.greetingOf(new Date(2026, 11, 31, 10)), 'よいお年を');
+  assert.strictEqual(T.greetingOf(new Date(2026, 11, 31, 22)), '今年もおつかれさまでした');
+  assert.strictEqual(T.greetingOf(new Date(2026, 10, 1, 8)), '新しい月のはじまりです');
+  assert.ok(T.greetingCandidates(new Date(2026, 10, 1, 20)).length > 1, '1日の夜はふだんの挨拶');
+});
+
+test('挨拶はどれも12文字まで（写真の上に1行で収まる）', () => {
+  const all = [...Object.values(T.GREETINGS).flat(), ...T.EXTRA_GREETINGS.map(g => g.text),
+    '新年おめでとうございます', 'よいお年を', '今年もおつかれさまでした', '新しい月のはじまりです'];
+  all.forEach(s => assert.ok([...s].length <= 12, `${s}（${[...s].length}文字）`));
 });
 
 test('見た目：秋の夜は C と満月の写真', () => {
