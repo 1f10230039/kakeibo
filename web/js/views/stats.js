@@ -7,6 +7,7 @@ import * as C from '../calc.js';
 import { GROUP_CLASS } from '../icons.js';
 import { esc, money, icon, onSwipe, seg, tween } from '../ui.js';
 import { row } from './home.js';
+import { incomeRow } from './income.js';
 
 const UNIT_NAME = { week: '週', month: '月', year: '年' };
 const view = { unit: 'month', offset: 0, chart: 'bar', bucket: null, group: null, cat: null, dir: 0 };
@@ -35,6 +36,14 @@ export function render(ctx) {
     list = C.spendBetween(list, b.start, b.end);
     filterLabel = view.unit === 'week' ? `${b.sub}（${b.label}）` : view.unit === 'month' ? `${b.label}（${b.sub}）` : b.label;
   }
+  // 収入も一覧に出す（支出と区別して）。カテゴリやグループで絞り込んでいるときは出さない
+  let incomes = C.incomeBetween(data.transactions, p.start, p.end);
+  const incomeTotal = C.sum(incomes);
+  if (view.chart === 'bar' && view.bucket !== null && p.buckets[view.bucket]) {
+    const b = p.buckets[view.bucket];
+    incomes = C.incomeBetween(incomes, b.start, b.end);
+  }
+  if (view.chart === 'pie' && (view.cat || view.group)) incomes = [];
   if (view.chart === 'pie' && view.cat) {
     list = list.filter(t => (t.category || '未分類') === view.cat);
     filterLabel = view.cat;
@@ -58,13 +67,14 @@ export function render(ctx) {
 
     <div class="stats-body">
       <section class="chart card" id="chart">
-        <div class="chart-total"><span class="label">合計</span>${money(C.sum(inPeriod), hidden, 'stats-total')}</div>
+        <div class="chart-total"><span class="label">支出の合計</span>${money(C.sum(inPeriod), hidden, 'stats-total')}</div>
+        ${incomeTotal ? `<div class="chart-income" data-key="inc"><span class="label">収入</span><span class="pos">+${money(incomeTotal, hidden)}</span></div>` : ''}
         ${view.chart === 'bar' ? barChart(C.bucketTotals(data.transactions, p), hidden) : pieChart(C.groupTotals(inPeriod, data.categories), hidden)}
       </section>
 
       <section class="tx-list">
-        <div class="section"><h2>利用一覧</h2>${filterLabel ? `<button class="chip filter" data-key="${esc(filterLabel)}" data-act="clear">${esc(filterLabel)}で絞り込み中 ${icon('close')}</button>` : ''}</div>
-        ${list.length ? byDate(list, groupOf, hidden, C.displayNames(data.rules)) : '<p class="empty">この期間の利用はありません</p>'}
+        <div class="section"><h2>一覧</h2>${filterLabel ? `<button class="chip filter" data-key="${esc(filterLabel)}" data-act="clear">${esc(filterLabel)}で絞り込み中 ${icon('close')}</button>` : ''}</div>
+        ${list.length || incomes.length ? byDate([...list, ...incomes], groupOf, hidden, C.displayNames(data.rules)) : '<p class="empty">この期間の利用はありません</p>'}
       </section>
     </div>
   </div>`;
@@ -142,7 +152,7 @@ function byDate(list, groupOf, hidden, names) {
       current = t.date;
       html += `<h3 class="date" data-key="h:${esc(t.date)}">${esc(C.mdw(C.parseYmd(t.date)))}</h3><div class="list card" data-key="d:${esc(t.date)}">`;
     }
-    html += row(t, groupOf(t.category), hidden, C.subtitleOf(t, names));
+    html += t.type === '収入' ? incomeRow(t, hidden) : row(t, groupOf(t.category), hidden, C.subtitleOf(t, names));
   });
   return html + '</div>';
 }

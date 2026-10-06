@@ -58,6 +58,8 @@ const DB = {
     tx(-75, 'APPLE COM BILL', 1200, 'サブスク'),
     tx(-90, 'SAMPLE MART', 2900, '食費'),
     { id: 'h_mock1', type: '支出', date: d(-2), merchant: '', amount: 300, payMonth: '', status: '手入力', category: '食費', categoryBy: '個別', source: '手入力', memo: 'コンビニ' },
+    ...[[-3, 5000, 'お小遣い'], [-11, 52000, 'バイト代'], [-41, 48000, 'バイト代']].map(([o, amount, memo], i) => (
+      { id: `h_inc${i}`, type: '収入', date: d(o), merchant: '', amount, payMonth: '', status: '手入力', category: '', categoryBy: '', source: '手入力', memo })),
   ],
   categories: [
     ['食費', '暮らし'], ['日用品', '暮らし'], ['交通費', '暮らし'], ['健康・医療', '暮らし'],
@@ -96,6 +98,11 @@ export async function mockCall(action, p) {
       const id = 'h_mock' + Date.now();
       DB.transactions.push({ id, type: '支出', date: p.date, merchant: '', amount: p.amount, payMonth: '', status: '手入力',
         category: p.category || '', categoryBy: p.category ? '個別' : '未分類', source: '手入力', memo: p.memo || '' });
+      return { id };
+    }
+    case 'addIncome': {
+      const id = 'h_inc' + Date.now();
+      DB.transactions.push({ id, type: '収入', date: p.date, merchant: '', amount: p.amount, payMonth: '', status: '手入力', category: '', categoryBy: '', source: '手入力', memo: p.memo || '' });
       return { id };
     }
     case 'setMemo': find(p.id).memo = p.memo; return { id: p.id };

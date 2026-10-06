@@ -155,6 +155,17 @@ test('「資産を記録する」：25日〜月末は今月、1〜7日は先月�
   assert.deepStrictEqual(C.assetDue([], D(2026, 1, 5)).date, '2025-12-31');
 });
 
+test('収入：今月の入金（1日〜今日、取消は入れない）。支出の集計と未分類には入らない', () => {
+  const inc = (date, amount, extra = {}) => tx(date, amount, { type: '収入', status: '手入力', source: '手入力', category: '', payMonth: '', ...extra });
+  const txs = [inc('2026-10-03', 5000, { memo: 'お小遣い' }), inc('2026-09-25', 52000, { memo: 'バイト代' }), inc('2026-10-04', 999, { status: '取消' }), tx('2026-10-02', 300)];
+  assert.strictEqual(C.monthIncome(txs, D(2026, 10, 6)), 5000);
+  assert.strictEqual(C.monthToDate(txs, D(2026, 10, 6)), 300);
+  assert.deepStrictEqual(C.unclassified(txs).map(t => t.amount), []);
+  assert.deepStrictEqual(C.categoryTotals(txs).map(c => c.total), [300]);
+  assert.deepStrictEqual(C.incomeNames(txs), ['お小遣い', 'バイト代']);
+  assert.deepStrictEqual(C.incomeNames([inc('2026-10-01', 1, { memo: '仕送り' })]), ['仕送り', 'バイト代', 'お小遣い']);
+});
+
 test('金額の書き方', () => {
   assert.strictEqual(C.yen(1234567), '¥1,234,567');
 });

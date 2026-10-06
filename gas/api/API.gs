@@ -148,6 +148,7 @@ const ACTIONS = {
   /** 1件だけカテゴリを変える（F-12）。空にすると未分類に戻る。 */
   setCategory({ id, category }, { store }) {
     const row = findTx(store, id);
+    if (row['種類'] !== '支出') throw new UserError('カテゴリを付けられるのは支出だけです');
     checkCategory(store, category, true);
     row['カテゴリ'] = category;
     row['カテゴリの決め方'] = category ? '個別' : '未分類';
@@ -176,7 +177,7 @@ const ACTIONS = {
     }
     let updated = 0;
     store.rows(SHEET.TX)
-      .filter(r => r['状態'] !== '取消' && r['カテゴリの決め方'] !== '個別' && normalizeMerchant(r['利用先']) === key)
+      .filter(r => r['種類'] === '支出' && r['状態'] !== '取消' && r['カテゴリの決め方'] !== '個別' && normalizeMerchant(r['利用先']) === key)
       .forEach(r => {
         r['カテゴリ'] = category;
         r['カテゴリの決め方'] = '対応表';
@@ -206,6 +207,23 @@ const ACTIONS = {
       'id': id, '種類': '支出', '利用日': date, '利用先': '', '金額': amount, '支払月': '',
       '状態': '手入力', 'カテゴリ': category || '', 'カテゴリの決め方': category ? '個別' : '未分類',
       '出どころ': '手入力', '対応する速報': '', 'メモ': memo || '', '取り込み日時': now(),
+    }]);
+    return { id };
+  },
+
+  /**
+   * 収入を手で足す（F-31）。楽天銀行の取引通知メールに金額が載るか分かるまでは手入力（10/6 本人）。
+   * memo は名前（バイト代・お小遣いなど）。カテゴリは付けない。
+   */
+  addIncome({ date, amount, memo }, { store, now, newId }) {
+    checkDate(date);
+    if (!Number.isInteger(amount) || amount < 1 || amount > 100000000) throw new UserError('amount は 1〜100,000,000 の整数にしてください');
+    checkText(memo, 'memo', 100, true);
+    const id = newId();
+    store.append(SHEET.TX, [{
+      'id': id, '種類': '収入', '利用日': date, '利用先': '', '金額': amount, '支払月': '',
+      '状態': '手入力', 'カテゴリ': '', 'カテゴリの決め方': '', '出どころ': '手入力', '対応する速報': '',
+      'メモ': (memo || '').trim(), '取り込み日時': now(),
     }]);
     return { id };
   },

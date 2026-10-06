@@ -22,6 +22,7 @@ export function render(ctx) {
   const sp = C.spendable(txs, data.assets, today);
   const assetsNow = C.assetHistory(data.assets).at(-1);
   const assetDue = C.assetDue(data.assets, today);
+  const hasIncome = txs.some(C.isIncome);
 
   const unclassified = C.unclassified(txs).length;
   const stale = C.staleSokuho(txs, today).length;
@@ -56,7 +57,9 @@ export function render(ctx) {
       </section>
 
       <div class="pair">
-        <div class="mini card"><div class="label">収入</div><div class="num muted">—</div><div class="soon">準備中</div></div>
+        <a class="mini card" href="#/income"><div class="label">収入</div>
+          <div class="num">${hasIncome ? money(C.monthIncome(txs, today), hidden) : '<span class="muted">—</span>'}</div>
+          <div class="soon">${hasIncome ? '今月の入金' : '記録すると出ます'}</div></a>
         <a class="mini card" href="#/assets"><div class="label">残高</div>
           <div class="num">${sp ? signedMoney(sp.amount, hidden) : '<span class="muted">—</span>'}</div>
           <div class="soon">${sp ? 'カード代を引いた額' : '資産を記録すると出ます'}</div>

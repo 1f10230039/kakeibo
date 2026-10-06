@@ -120,7 +120,7 @@ export function groupTotals(txs, categories) {
 
 /** 振り分けを待っている行：確定か手入力で、カテゴリが空のもの（速報は店名がまだないので入れない）。 */
 export function unclassified(txs) {
-  return txs.filter(t => t.status !== '取消' && t.status !== '速報' && !t.category);
+  return txs.filter(t => t.type === '支出' && t.status !== '取消' && t.status !== '速報' && !t.category);
 }
 
 /** 確定にならないまま days 日（初期値14日）たった速報。 */
@@ -189,6 +189,30 @@ export function displayNames(rules) {
 /** 一覧で用途の横に出す名前：この利用だけの名前（メモ）があればそれ、なければ店の表示名、どちらもなければ空。 */
 export function subtitleOf(t, names) {
   return t.memo || (t.merchant && names.get(normalizeMerchant(t.merchant))) || '';
+}
+
+// ---- 収入（段階③。いまは手入力。楽天銀行の取引通知メールの形が分かったら自動にする） ----
+
+/** 収入として数える行：種類＝収入、状態≠取消。 */
+export function isIncome(t) {
+  return t.type === '収入' && t.status !== '取消';
+}
+export function incomeBetween(txs, start, end) {
+  return txs.filter(t => isIncome(t) && between(t, start, end));
+}
+/** 今月の収入（1日〜今日の入金の合計）。 */
+export function monthIncome(txs, today) {
+  return sum(incomeBetween(txs, new Date(today.getFullYear(), today.getMonth(), 1), today));
+}
+/** 収入の名前の候補：前に使った名前（新しい順・重ならない）のあとに「バイト代」「お小遣い」（10/6 本人の例）。 */
+export function incomeNames(txs, limit = 6) {
+  const names = [];
+  newestFirst(txs.filter(isIncome)).forEach(t => {
+    const n = (t.memo || '').trim();
+    if (n && !names.includes(n)) names.push(n);
+  });
+  ['バイト代', 'お小遣い'].forEach(n => { if (!names.includes(n)) names.push(n); });
+  return names.slice(0, limit);
 }
 
 // ---- 予算（段階②。全体の予算だけ） ----

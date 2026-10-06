@@ -239,6 +239,36 @@ test('setBudget：月・金額の形が違えば断る', () => {
   assert.strictEqual(store.tables['予算'].length, 0);
 });
 
+// ---- 収入 ----
+test('addIncome：種類＝収入・手入力で足す。名前はメモ。getData で type が収入になる', () => {
+  const { call, store } = setup();
+  assert.deepStrictEqual(call({ key: KEY, action: 'addIncome', params: { date: '2026-10-25', amount: 52000, memo: ' バイト代 ' } }), { ok: true, data: { id: 'h_new' } });
+  const row = store.tables['取引'].at(-1);
+  assert.deepStrictEqual([row['種類'], row['状態'], row['出どころ'], row['カテゴリ'], row['メモ'], row['金額']], ['収入', '手入力', '手入力', '', 'バイト代', 52000]);
+  const t = call({ key: KEY, action: 'getData', params: { from: '2026-10', to: '2026-10' } }).data.transactions.find(x => x.id === 'h_new');
+  assert.deepStrictEqual([t.type, t.memo], ['収入', 'バイト代']);
+});
+test('addIncome：金額・日付・名前の形が違えば断る', () => {
+  const { call, store } = setup();
+  const before = store.tables['取引'].length;
+  for (const params of [{ date: '2026-10-25', amount: 0 }, { date: '2026-10-25', amount: 1.5 }, { date: '2026-10-25', amount: 100000001 },
+    { date: '2026-13-01', amount: 1000 }, { date: '2026-10-25', amount: 1000, memo: '=1+1' }, { date: '2026-10-25', amount: 1000, memo: 'x'.repeat(101) }]) {
+    assert.strictEqual(call({ key: KEY, action: 'addIncome', params }).ok, false, JSON.stringify(params));
+  }
+  assert.strictEqual(store.tables['取引'].length, before);
+});
+test('収入：カテゴリは付けられない。対応表も収入の行には当てない。名前の変更と取消はできる', () => {
+  const { call, store } = setup();
+  call({ key: KEY, action: 'addIncome', params: { date: '2026-10-25', amount: 52000, memo: 'バイト代' } });
+  store.tables['取引'].push({ 'id': 'h_in2', '種類': '収入', '利用日': '2026-10-26', '利用先': 'APPLE COM BILL', '金額': 1, '支払月': '', '状態': '手入力', 'カテゴリ': '', 'カテゴリの決め方': '', '出どころ': '手入力', '対応する速報': '', _row: store.tables['取引'].length + 2 });
+  assert.strictEqual(call({ key: KEY, action: 'setCategory', params: { id: 'h_new', category: '食費' } }).ok, false);
+  call({ key: KEY, action: 'setRule', params: { merchant: 'APPLE COM BILL', category: 'サブスク' } });
+  assert.strictEqual(store.tables['取引'].find(r => r.id === 'h_in2')['カテゴリ'], '');
+  assert.strictEqual(call({ key: KEY, action: 'setMemo', params: { id: 'h_new', memo: 'お小遣い' } }).ok, true);
+  assert.strictEqual(call({ key: KEY, action: 'deleteManual', params: { id: 'h_new' } }).ok, true);
+  assert.strictEqual(store.tables['取引'].find(r => r.id === 'h_new')['状態'], '取消');
+});
+
 // ---- 資産 ----
 test('setAssetRecord：楽天銀行と NISA（評価額・元本）を1回で記録する。getData で返る', () => {
   const { call, store } = setup();

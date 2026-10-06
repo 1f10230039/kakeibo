@@ -8,20 +8,21 @@ import * as home from './views/home.js';
 import * as stats from './views/stats.js';
 import * as budget from './views/budget.js';
 import * as assets from './views/assets.js';
+import * as income from './views/income.js';
 import { openDetail, openManual } from './views/sheets.js';
 import * as pages from './views/pages.js';
 
 const ROUTES = {
   home, stats,
   budget,
-  assets,
+  assets, income,
   menu: pages.menu, rules: pages.rules, unclassified: pages.unclassified, stale: pages.stale, key: pages.key,
 };
 const TABS = [['home', 'ホーム'], ['stats', '統計'], ['budget', '予算'], ['assets', '資産']];
 // 画面の深さ。深いほうへ進むときは右から、戻るときは左から入ってくる。同じ深さ（タブどうし）は下からふわっと
-const DEPTH = { menu: 1, unclassified: 1, stale: 1, rules: 2 };
+const DEPTH = { menu: 1, unclassified: 1, stale: 1, income: 1, rules: 2 };
 // 画面に入ったとき、上から順に少しずつ遅らせて出す部分
-const RISE = '.spend, .budget-main, .budget-empty, .asset-main, .asset-chart, .asset-spend, .asset-empty, .pair, .due, .todo, .home-side > *, .page-head, .controls, .period, .chart, .tx-list > *, .lead, .menu-group-label, .list, .progress, .sort-card, .switch-row, .field, .picker-group, .btn.wide, .note, .credit, .empty';
+const RISE = '.spend, .income-main, .budget-main, .budget-empty, .asset-main, .asset-chart, .asset-spend, .asset-empty, .pair, .due, .todo, .home-side > *, .page-head, .controls, .period, .chart, .tx-list > *, .lead, .menu-group-label, .list, .progress, .sort-card, .switch-row, .field, .picker-group, .btn.wide, .note, .credit, .empty';
 
 const state = { data: null, fetchedAt: 0, hidden: readHidden(), loading: false };
 const root = document.getElementById('app');
@@ -45,7 +46,7 @@ function context(entering = false) {
     refresh,
     write,
     openDetail: id => openDetail(context(), id),
-    openManual: () => openManual(context()),
+    openManual: kind => openManual(context(), kind),
     openAsset: date => assets.openAssetSheet(context(), { date }),
     toggleHidden() {
       state.hidden = !state.hidden;

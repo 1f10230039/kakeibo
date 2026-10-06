@@ -91,6 +91,8 @@ export const setCategory = (id, category) => call('setCategory', { id, category 
 export const setRule = (merchant, category, displayName) => call('setRule', displayName === undefined ? { merchant, category } : { merchant, category, displayName });
 export const setMemo = (id, memo) => call('setMemo', { id, memo });
 export const addManual = (entry) => call('addManual', entry);
+/** 収入を手で足す。entry：{ date, amount, memo（名前） } */
+export const addIncome = (entry) => call('addIncome', entry);
 export const deleteManual = (id) => call('deleteManual', { id });
 export const resolveSokuho = (id) => call('resolveSokuho', { id });
 export const setSetting = (key, value) => call('setSetting', { key, value });

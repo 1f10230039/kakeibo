@@ -39,6 +39,11 @@ export function iconMark(category, group) {
   return `<span class="mark ${GROUP_CLASS[group] || 'g4'}">${categoryIcon(category || '未分類')}</span>`;
 }
 
+/** 収入の行の印（入金のアイコン）。 */
+export function incomeMark() {
+  return `<span class="mark g1 income-mark">${UI_ICON.income}</span>`;
+}
+
 export function icon(name) {
   return UI_ICON[name] || '';
 }
@@ -72,6 +77,7 @@ export function openSheet(innerHtml, onMount) {
   dragToClose(sheet, close);
   sheetCloser = close;
   addClearButtons(wrap);
+  applyVars(wrap); // シートの中の切り替えボタンの背景の位置
   onMount(sheet, close);
 }
 
