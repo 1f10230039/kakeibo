@@ -205,6 +205,26 @@ test('CSV：その月の支払い分・「以降」の分・外す行（返金�
   assert.deepStrictEqual([p.later.length, p.skipped.map(s => s.amount)], [1, [-500, 800]]);
 });
 
+const enaviOld = fs.readFileSync(new URL('./fixtures/enavi_dummy_old.csv', import.meta.url), 'utf8');
+
+test('CSV（前の月の形）：支払月の列なし・「利用国USA」を外す・補足の行と空の行は飛ばす・キャンセルの欄は足さない', () => {
+  const p = V.parseEnaviCsv(enaviOld);
+  assert.strictEqual(p.statementMonth, '2026-07');
+  assert.deepStrictEqual(p.rows.map(r => [r.date, r.merchant, r.amount, r.payMonth]), [
+    ['2026-06-30', 'サンプルマート', 1000, '2026-07'], ['2026-06-29', 'EXAMPLE* CLOUD SVC', 3693, '2026-07'],
+    ['2026-06-22', 'SAMPLE MART', 149, '2026-07'], ['2026-05-27', 'EXAMPLE BOOKS', 6600, '2026-07'],
+  ]);
+  assert.deepStrictEqual([p.cancels.map(c => [c.date, c.amount]), p.skipped.map(s => s.amount), p.later.length], [[['2026-07-15', 561]], [800], 0]);
+});
+
+test('合計：明細の利用・キャンセルなど・差し引いた支払金額・シートのその月の支払い分（取消・手入力・収入・ほかの月は入れない）', () => {
+  const p = V.parseEnaviCsv(enaviOld);
+  const t = (amount, extra = {}) => ({ id: 'x' + amount, type: '支出', date: '2026-06-30', amount, status: '確定', source: 'メール', payMonth: '2026-07', ...extra });
+  const txs = [t(1000), t(3693, { source: 'CSV' }), t(149, { status: '速報' }), t(999, { status: '取消' }), t(300, { source: '手入力', status: '手入力' }),
+    t(5000, { type: '収入', source: '手入力', status: '手入力' }), t(7, { payMonth: '2026-08' })];
+  assert.deepStrictEqual({ ...V.totals(txs, p) }, { use: 11442, cancel: 561, pay: 10881, sheet: 4842, diff: -6600 });
+});
+
 test('CSV：12月の利用 → 翌年1月払い。形の違うファイルは断る', () => {
   const jan = enavi.replace('10月支払金額', '1月支払金額').replace(/"10月"/g, '"1月"').replace(/2026\/09/g, '2026/12');
   assert.strictEqual(V.parseEnaviCsv(jan).statementMonth, '2027-01');

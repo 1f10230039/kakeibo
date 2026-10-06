@@ -36,8 +36,9 @@ export function render(ctx) {
         <div><b>${addRows.length}</b><span>足す候補</span></div>
         <div><b>${cancelRows.length}</b><span>キャンセルかも</span></div>
       </div>
+      ${totalsBlock(V.totals(data.transactions, p), p, hidden)}
       ${p.later.length ? `<p class="note-s">${nextM}月以降の支払い分 ${p.later.length}件は、まだ決まっていないので、次の月の CSV で照らし合わせます。</p>` : ''}
-      ${p.skipped.length ? `<p class="note-s">本人以外の利用・返金などの ${p.skipped.length}件は読みませんでした。</p>` : ''}
+      ${p.skipped.length ? `<p class="note-s">本人以外の利用などの ${p.skipped.length}件は読みませんでした。</p>` : ''}
     </section>
     ${!addRows.length && !cancelRows.length ? '<p class="empty big">CSV とメールの記録は、全部一致しました 🎉</p>' : ''}
     ${addRows.length ? `<div class="section"><h2>CSV にだけある利用</h2><span class="more">足す</span></div>
@@ -58,6 +59,20 @@ export function render(ctx) {
         </label>`).join('')}</div>` : ''}
     ${addRows.length || cancelRows.length ? '<button class="btn primary wide" data-act="apply"></button>' : ''}
   </div>`;
+}
+
+/** 合計：シートのその月の支払い分が、明細の利用の合計と同じなら、その月はそろっている（10/6 本人）。 */
+function totalsBlock(t, p, hidden) {
+  const m = Number(p.statementMonth.slice(5));
+  const state = t.diff === 0 ? '<span class="ok">✓ そろっています</span>'
+    : `<span class="ng">${hidden ? '' : esc(C.yen(Math.abs(t.diff)))} ${t.diff < 0 ? '足りません' : '多いです'}</span>`;
+  return `<dl class="csv-totals">
+      <div><dt>明細の利用の合計</dt><dd>${money(t.use, hidden)}</dd></div>
+      <div><dt>シートの${m}月払いの合計</dt><dd>${money(t.sheet, hidden)}${state}</dd></div>
+      ${t.cancel ? `<div><dt>キャンセルなど ${p.cancels.length}件</dt><dd>−${money(t.cancel, hidden)}</dd></div>` : ''}
+      <div class="pay"><dt>差し引いた支払金額</dt><dd>${money(t.pay, hidden)}</dd></div>
+    </dl>
+    <p class="note-s">${t.cancel ? 'キャンセルなどの行は、元の利用と同じ金額とは限らないので、シートには入れません。' : ''}差し引いた支払金額は、e-NAVI の一覧の支払金額と同じになるはずです。違うときは、ポイントでの支払いなど、CSV に出てこないものがあるのかもしれません。</p>`;
 }
 
 export function mount(root, ctx) {

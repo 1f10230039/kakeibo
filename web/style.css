@@ -403,6 +403,15 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 .csv-counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; text-align: center; }
 .csv-counts b { display: block; font-family: var(--font-num); font-weight: var(--num-weight); font-size: 26px; line-height: 1.2; }
 .csv-counts span { font-size: 10.5px; color: var(--ink2); white-space: nowrap; letter-spacing: -.02em; }
+.csv-totals { display: grid; gap: 6px; margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; }
+.csv-totals > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.csv-totals dt { color: var(--ink2); }
+.csv-totals dd { margin: 0; display: flex; align-items: baseline; gap: 8px; }
+.csv-totals .money { font-family: var(--font-num); font-weight: var(--num-weight); font-size: 16px; }
+.csv-totals .pay { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 2px; }
+.csv-totals .pay dt { color: var(--ink); font-weight: 500; }
+.csv-totals .ok { font-size: 11px; color: var(--accent); white-space: nowrap; }
+.csv-totals .ng { font-size: 11px; color: var(--warn); white-space: nowrap; }
 .check-row { cursor: pointer; }
 .check-row input { width: 20px; height: 20px; accent-color: var(--accent); flex-shrink: 0; margin: 0; }
 
