@@ -95,6 +95,18 @@ export function closeSheet() {
   if (sheetCloser) sheetCloser();
 }
 
+/** 金額の欄（「¥」の横の大きな数字）：数字だけにして 3けたごとに区切り、幅を中身に合わせる。読むときは amountOf。 */
+export function bindAmountInput(el) {
+  const format = () => {
+    const digits = el.value.replace(/[^0-9０-９]/g, '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+    el.value = digits ? Number(digits).toLocaleString('ja-JP') : '';
+    el.style.width = `${Math.max(2, el.value.length) + 1}ch`; // 「¥」のすぐ横に数字が並ぶように
+  };
+  el.addEventListener('input', format);
+  format();
+}
+export const amountOf = el => Number(el.value.replace(/,/g, ''));
+
 /** data-clear の付いた文字の欄に、中身を消す × を付ける。 */
 export function addClearButtons(root) {
   root.querySelectorAll('input[data-clear]').forEach(input => {

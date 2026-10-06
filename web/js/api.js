@@ -94,3 +94,5 @@ export const addManual = (entry) => call('addManual', entry);
 export const deleteManual = (id) => call('deleteManual', { id });
 export const resolveSokuho = (id) => call('resolveSokuho', { id });
 export const setSetting = (key, value) => call('setSetting', { key, value });
+/** 予算。month：'' なら毎月、'YYYY-MM' ならその月だけ。amount：null ならやめる。 */
+export const setBudget = (month, amount) => call('setBudget', { month, amount });

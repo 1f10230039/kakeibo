@@ -129,7 +129,9 @@ const ACTIONS = {
         .map(r => ({ name: r['カテゴリ'], group: r['グループ'], order: Number(r['並び順']) }))
         .sort((a, b) => a.order - b.order),
       rules: store.rows(SHEET.RULES).map(r => ({ merchant: r['利用先'], category: r['カテゴリ'], displayName: r['表示名'] || '' })),
-      budgets: store.rows(SHEET.BUDGET).map(r => ({ month: r['月'], target: r['対象'], amount: Number(r['金額']) })),
+      budgets: store.rows(SHEET.BUDGET)
+        .filter(r => r['金額'] !== '' && Number(r['金額']) > 0) // 金額が空の行は「やめた予算」
+        .map(r => ({ month: r['月'], target: r['対象'], amount: Number(r['金額']) })),
       assets: store.rows(SHEET.ASSETS).map(r => ({ date: r['記録日'], item: r['項目'], amount: Number(r['金額']) })),
       settings: {
         weekStart: settings['週の始まり'] || '月',
@@ -233,6 +235,22 @@ const ACTIONS = {
     row['状態'] = '取消';
     store.update(SHEET.TX, row);
     return { id };
+  },
+
+  /**
+   * 予算（F-21）。いまは全体の予算だけ（U-02 → 10/6 本人「全体だけ」）。
+   * month：'' なら毎月の予算、'YYYY-MM' ならその月だけの予算（毎月の予算より優先）。
+   * amount：1〜10,000,000 の整数。null なら、その予算をやめる（行は消さずに金額を空にする。行の番号をずらさないため）。
+   */
+  setBudget({ month, amount }, { store }) {
+    if (month !== '') checkMonth(month, 'month');
+    if (amount !== null && (!Number.isInteger(amount) || amount < 1 || amount > 10000000)) {
+      throw new UserError('amount は 1〜10,000,000 の整数か、null（やめる）にしてください');
+    }
+    const row = store.rows(SHEET.BUDGET).find(r => r['月'] === month && r['対象'] === '全体');
+    if (row) { row['金額'] = amount === null ? '' : amount; store.update(SHEET.BUDGET, row); }
+    else if (amount !== null) store.append(SHEET.BUDGET, [{ '月': month, '対象': '全体', '金額': amount }]);
+    return { month, amount };
   },
 
   setSetting({ key, value }, { store }) {

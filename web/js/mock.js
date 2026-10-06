@@ -59,7 +59,7 @@ const DB = {
     { merchant: 'SAMPLE MART', category: '食費', displayName: '' }, { merchant: 'JR EAST', category: '交通費', displayName: '' },
     { merchant: 'APPLE COM BILL', category: 'サブスク', displayName: 'Apple One' },
   ],
-  budgets: [], assets: [],
+  budgets: [{ month: '', target: '全体', amount: 50000 }], assets: [],
   settings: { weekStart: '月', lastIngest: `${d(0)} 06:12`, unreadableMails: 0 },
 };
 
@@ -90,6 +90,11 @@ export async function mockCall(action, p) {
     case 'setMemo': find(p.id).memo = p.memo; return { id: p.id };
     case 'deleteManual': case 'resolveSokuho': find(p.id).status = '取消'; return { id: p.id };
     case 'setSetting': DB.settings.weekStart = p.value; return p;
+    case 'setBudget': {
+      DB.budgets = DB.budgets.filter(b => !(b.target === '全体' && b.month === p.month));
+      if (p.amount !== null) DB.budgets.push({ month: p.month, target: '全体', amount: p.amount });
+      return p;
+    }
     default: throw new Error('mock: ' + action);
   }
 }

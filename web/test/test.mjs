@@ -97,6 +97,26 @@ test('名前（サブタイトル）：この利用だけの名前 → 店の表
   assert.strictEqual(C.subtitleOf({ merchant: '', memo: '' }, names), '');
 });
 
+test('予算：その月だけの予算 → 毎月の予算 → なし の順。やめた（0）予算は使わない', () => {
+  const b = [{ month: '', target: '全体', amount: 50000 }, { month: '2026-10', target: '全体', amount: 60000 }, { month: '2026-11', target: '全体', amount: 0 }];
+  assert.deepStrictEqual(C.budgetFor(b, '2026-10'), { amount: 60000, monthly: false });
+  assert.deepStrictEqual(C.budgetFor(b, '2026-11'), { amount: 50000, monthly: true });
+  assert.strictEqual(C.budgetFor([{ month: '2026-10', target: '全体', amount: 60000 }], '2026-12'), null);
+  assert.strictEqual(C.budgetFor([], '2026-10'), null);
+});
+
+test('予算の様子：使った・残り・今日までの目安・1日あたり（今日を含めて割る）', () => {
+  // 10/6（31日の月）：予算 31,000、使った 10,000
+  const s = C.budgetStatus([tx('2026-10-01', 6000), tx('2026-10-06', 4000), tx('2026-10-07', 999), tx('2026-09-30', 500)], 31000, D(2026, 10, 6));
+  assert.deepStrictEqual([s.spent, s.remaining, s.pace, s.daysLeft, s.perDay, s.over], [10000, 21000, 6000, 26, 807, false]);
+  assert.strictEqual(s.paceRatio, 6 / 31);
+});
+
+test('予算の様子：使いすぎたら over、1日あたりは 0', () => {
+  const s = C.budgetStatus([tx('2026-10-02', 12000)], 10000, D(2026, 10, 31));
+  assert.deepStrictEqual([s.remaining, s.over, s.perDay, s.daysLeft, s.pace], [-2000, true, 0, 1, 10000]);
+});
+
 test('金額の書き方', () => {
   assert.strictEqual(C.yen(1234567), '¥1,234,567');
 });

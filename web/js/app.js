@@ -6,12 +6,13 @@ import { lookOf } from './theme.js';
 import { toast, closeSheet, icon, addClearButtons, morph, applyVars, countUp, reduceMotion } from './ui.js';
 import * as home from './views/home.js';
 import * as stats from './views/stats.js';
+import * as budget from './views/budget.js';
 import { openDetail, openManual } from './views/sheets.js';
 import * as pages from './views/pages.js';
 
 const ROUTES = {
   home, stats,
-  budget: pages.soon('予算', '②'),
+  budget,
   assets: pages.soon('資産', '③'),
   menu: pages.menu, rules: pages.rules, unclassified: pages.unclassified, stale: pages.stale, key: pages.key,
 };
@@ -19,7 +20,7 @@ const TABS = [['home', 'ホーム'], ['stats', '統計'], ['budget', '予算'], 
 // 画面の深さ。深いほうへ進むときは右から、戻るときは左から入ってくる。同じ深さ（タブどうし）は下からふわっと
 const DEPTH = { menu: 1, unclassified: 1, stale: 1, rules: 2 };
 // 画面に入ったとき、上から順に少しずつ遅らせて出す部分
-const RISE = '.spend, .pair, .due, .todo, .home-side > *, .page-head, .controls, .period, .chart, .tx-list > *, .lead, .menu-group-label, .list, .progress, .sort-card, .switch-row, .field, .picker-group, .btn.wide, .note, .credit, .soon-card, .empty';
+const RISE = '.spend, .budget-main, .budget-empty, .pair, .due, .todo, .home-side > *, .page-head, .controls, .period, .chart, .tx-list > *, .lead, .menu-group-label, .list, .progress, .sort-card, .switch-row, .field, .picker-group, .btn.wide, .note, .credit, .soon-card, .empty';
 
 const state = { data: null, fetchedAt: 0, hidden: readHidden(), loading: false };
 const root = document.getElementById('app');

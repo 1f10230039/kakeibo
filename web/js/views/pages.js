@@ -113,7 +113,7 @@ export const menu = {
         <a class="row link" href="#/rules"><span class="t"><b>カテゴリの対応表</b><small>店 → カテゴリ（${ctx.data.rules.length}件）</small></span>${icon('chevron')}</a>
         <div class="row"><span class="t"><b>週の始まり</b><small>統計の「週」と、ホームの「今週」</small></span>
           ${seg('week', [['月', '月曜'], ['日', '日曜']], s.weekStart, '週の始まり')}</div>
-        <div class="row"><span class="t"><b>予算の設定</b><small>段階②で作ります</small></span></div>
+        <a class="row link" href="#/budget"><span class="t"><b>予算</b><small>${budgetLabel(ctx)}</small></span>${icon('chevron')}</a>
         <div class="row"><span class="t"><b>CSV の取り込みと照合</b><small>e-NAVI の CSV の形がわかってから作ります</small></span></div>
       </div>
       <div class="menu-group-label">状態</div>
@@ -143,6 +143,12 @@ export const menu = {
     });
   },
 };
+
+/** メニューの「予算」の下に出す一言。 */
+function budgetLabel(ctx) {
+  const every = ctx.data.budgets.find(b => b.target === '全体' && !b.month && b.amount > 0);
+  return every ? `毎月 ${money(every.amount, ctx.hidden)}` : 'まだ決めていません';
+}
 
 // ---- S-10 対応表 ----
 

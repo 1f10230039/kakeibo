@@ -187,6 +187,42 @@ export function subtitleOf(t, names) {
   return t.memo || (t.merchant && names.get(normalizeMerchant(t.merchant))) || '';
 }
 
+// ---- 予算（段階②。全体の予算だけ） ----
+
+/**
+ * その月（YYYY-MM）の予算。その月だけの予算があればそれ、なければ毎月の予算。どちらもなければ null。
+ * 返すもの：{ amount, monthly（毎月の予算を使っているか） }
+ */
+export function budgetFor(budgets, month) {
+  const all = (budgets || []).filter(b => b.target === '全体' && b.amount > 0);
+  const only = all.find(b => b.month === month);
+  if (only) return { amount: only.amount, monthly: false };
+  const every = all.find(b => !b.month);
+  return every ? { amount: every.amount, monthly: true } : null;
+}
+
+/**
+ * 今月の予算の様子。
+ * - spent：今月使った額（1日〜今日、ホームの「今月の支出」と同じ数え方）
+ * - pace：今日の終わりまでに使ってよい目安（予算 × 今日までの日数 ÷ 月の日数）
+ * - perDay：月末まで（今日を含む）1日あたりあといくら使えるか。残りがなければ 0
+ */
+export function budgetStatus(txs, amount, today) {
+  const spent = monthToDate(txs, today);
+  const days = lastDayOfMonth(today.getFullYear(), today.getMonth());
+  const day = today.getDate();
+  const daysLeft = days - day + 1;
+  const remaining = amount - spent;
+  return {
+    amount, spent, remaining, daysLeft,
+    over: remaining < 0,
+    ratio: spent / amount,
+    paceRatio: day / days,
+    pace: Math.round((amount * day) / days),
+    perDay: remaining > 0 ? Math.floor(remaining / daysLeft) : 0,
+  };
+}
+
 // ---- 表示 ----
 
 export function yen(n) {

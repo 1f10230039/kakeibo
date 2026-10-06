@@ -210,6 +210,35 @@ test('setSetting：週の始まりだけ、月／日だけ', () => {
   assert.strictEqual(call({ key: KEY, action: 'setSetting', params: { key: '__proto__', value: 'x' } }).ok, false);
 });
 
+// ---- 予算 ----
+test('setBudget：毎月の予算と、その月だけの予算を足す・変える。getData で返る', () => {
+  const { call, store } = setup();
+  assert.strictEqual(call({ key: KEY, action: 'setBudget', params: { month: '', amount: 50000 } }).ok, true);
+  assert.strictEqual(call({ key: KEY, action: 'setBudget', params: { month: '2026-10', amount: 60000 } }).ok, true);
+  assert.strictEqual(call({ key: KEY, action: 'setBudget', params: { month: '', amount: 45000 } }).ok, true); // 変える（行は増やさない）
+  assert.strictEqual(store.tables['予算'].length, 2);
+  const data = call({ key: KEY, action: 'getData', params: { from: '2026-01', to: '2026-12' } }).data;
+  assert.deepStrictEqual(data.budgets, [{ month: '', target: '全体', amount: 45000 }, { month: '2026-10', target: '全体', amount: 60000 }]);
+});
+test('setBudget：null でやめる（行は残して金額を空に）。やめた予算は getData に出ない', () => {
+  const { call, store } = setup();
+  call({ key: KEY, action: 'setBudget', params: { month: '2026-10', amount: 60000 } });
+  assert.strictEqual(call({ key: KEY, action: 'setBudget', params: { month: '2026-10', amount: null } }).ok, true);
+  assert.strictEqual(store.tables['予算'].length, 1);
+  assert.strictEqual(store.tables['予算'][0]['金額'], '');
+  assert.strictEqual(call({ key: KEY, action: 'setBudget', params: { month: '2026-11', amount: null } }).ok, true); // ない予算をやめても行は足さない
+  assert.strictEqual(store.tables['予算'].length, 1);
+  assert.deepStrictEqual(call({ key: KEY, action: 'getData', params: { from: '2026-01', to: '2026-12' } }).data.budgets, []);
+});
+test('setBudget：月・金額の形が違えば断る', () => {
+  const { call, store } = setup();
+  for (const params of [{ month: '2026-13', amount: 1000 }, { month: '10月', amount: 1000 }, { amount: 1000 }, { month: '', amount: 0 }, { month: '', amount: 1.5 },
+    { month: '', amount: '50000' }, { month: '', amount: 10000001 }, { month: '' }]) {
+    assert.strictEqual(call({ key: KEY, action: 'setBudget', params }).ok, false, JSON.stringify(params));
+  }
+  assert.strictEqual(store.tables['予算'].length, 0);
+});
+
 // ---- 中の失敗 ----
 test('シートの読み書きで失敗しても、中身を漏らさず決まった文だけ返す', () => {
   const broken = { rows() { throw new Error('秘密のパス /x/y'); }, update() {}, append() {} };

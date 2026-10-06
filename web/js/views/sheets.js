@@ -2,7 +2,7 @@
 
 import * as C from '../calc.js';
 import * as api from '../api.js';
-import { esc, money, iconMark, openSheet, toast, icon } from '../ui.js';
+import { esc, money, iconMark, openSheet, toast, icon, bindAmountInput, amountOf } from '../ui.js';
 
 /** カテゴリをグループごとに並べたボタン。 */
 export function categoryPicker(categories, selected) {
@@ -105,17 +105,13 @@ export function openManual(ctx) {
     <button class="btn primary wide" data-act="save">${icon('plus')}記録する</button>
   `, (sheet, close) => {
     const amountEl = sheet.querySelector('#amount');
-    amountEl.addEventListener('input', () => {
-      const digits = amountEl.value.replace(/[^0-9０-９]/g, '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
-      amountEl.value = digits ? Number(digits).toLocaleString('ja-JP') : '';
-      amountEl.style.width = `${Math.max(2, amountEl.value.length) + 1}ch`; // 「¥」のすぐ横に数字が並ぶように、幅を中身に合わせる
-    });
+    bindAmountInput(amountEl);
     sheet.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => {
       category = category === b.dataset.pick ? '' : b.dataset.pick;
       sheet.querySelectorAll('[data-pick]').forEach(x => x.classList.toggle('on', x.dataset.pick === category));
     }));
     sheet.querySelector('[data-act="save"]').addEventListener('click', async () => {
-      const amount = Number(amountEl.value.replace(/,/g, ''));
+      const amount = amountOf(amountEl);
       const date = sheet.querySelector('#date').value;
       const memo = sheet.querySelector('#memo').value.trim();
       if (!Number.isInteger(amount) || amount < 1) { toast('金額を入れてください', 'warn'); amountEl.focus(); return; }

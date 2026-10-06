@@ -4,6 +4,7 @@
 import * as C from '../calc.js';
 import { CATEGORY_PHOTO, categoryIcon } from '../icons.js';
 import { esc, money, iconMark, icon, seg } from '../ui.js';
+import { meter } from './budget.js';
 
 let topRange = 'week'; // 支出トップの期間：'week'（今週）／'month'（今月）
 
@@ -16,6 +17,8 @@ export function render(ctx) {
   const lastMonth = C.lastMonthToSameDay(txs, today);
   const diff = thisMonth - lastMonth;
   const debit = C.nextDebit(txs, today);
+  const budget = C.budgetFor(data.budgets, C.ym(today));
+  const bs = budget && C.budgetStatus(txs, budget.amount, today);
 
   const unclassified = C.unclassified(txs).length;
   const stale = C.staleSokuho(txs, today).length;
@@ -45,6 +48,8 @@ export function render(ctx) {
         <div class="label">今月の支出</div>
         <div class="big">${money(thisMonth, hidden, 'month')}</div>
         <div class="compare">先月の同じ日まで ${money(lastMonth, hidden)}　<b>${hidden ? '' : diff === 0 ? '同じ' : esc(C.yen(Math.abs(diff)).slice(1)) + (diff < 0 ? '円 少ない' : '円 多い')}</b></div>
+        ${bs ? `<a class="budget-mini${bs.over ? ' over' : ''}" href="#/budget" aria-label="予算の画面へ">${meter(bs, true)}
+          <span class="budget-line"><span>予算の${bs.over ? 'オーバー' : '残り'}</span>${money(Math.abs(bs.remaining), hidden)}</span></a>` : ''}
       </section>
 
       <div class="pair">
@@ -58,6 +63,7 @@ export function render(ctx) {
         ${unclassified ? `<a class="chip" href="#/unclassified"><span class="dot"></span>未分類が${unclassified}件</a>` : ''}
         ${stale ? `<a class="chip" href="#/stale"><span class="dot"></span>確認が必要な速報が${stale}件</a>` : ''}
         ${unreadable ? `<a class="chip" href="#/menu"><span class="dot"></span>読めなかったメールが${unreadable}通</a>` : ''}
+        ${budget ? '' : `<a class="chip" href="#/budget">${icon('budget')}予算を決める</a>`}
         <button class="chip primary" data-act="manual">${icon('plus')}記録する</button>
       </div>
     </div>
