@@ -451,6 +451,10 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 .fixed-main { margin: 10px 20px 0; padding: 26px 24px 22px; text-align: center; border-radius: 28px; box-shadow: 0 10px 40px rgba(0,0,0,.06); }
 .fixed-main .compare + .compare { margin-top: 4px; }
 .fixed-chart { margin-top: 14px; }
+/* 選んだ月の一覧：月が変わったら、なぞった向きからすべり込む（タップで変えたときは、ふわっと） */
+.month-list { animation: fade-in .35s var(--ease) both; }
+.fixed-page[data-dir="1"] .month-list { animation-name: in-from-right; }
+.fixed-page[data-dir="-1"] .month-list { animation-name: in-from-left; }
 /* 固定費の棒：カテゴリごとに固定費の色の濃さを変え、まだ来ていない分は斜線 */
 .part.f0 { color: var(--g2); }
 .part.f1 { color: color-mix(in srgb, var(--g2) 55%, var(--card)); }

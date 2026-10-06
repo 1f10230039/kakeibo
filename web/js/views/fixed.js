@@ -3,11 +3,13 @@
 // ホームの「固定費」のカードと、メニューから開く。行を押すと、その利用の詳細が開く（「まだ」の行は、その店のいちばん新しい利用）。
 // 棒グラフの下は、選んだ月の「◯月の固定費」の一覧1つだけ（10/7 本人）。今月は、もう来たものとまだ来ていないものを日にちの順に混ぜて出す。
 // パッと見の情報を減らすため、出し方の説明は ⓘ に入れる。
+// グラフを左右になぞると、選ぶ月が前後に1つずつ動く（10/7 本人：統計と同じように）。一覧はなぞった向きからすべり込む。
 
 import * as C from '../calc.js';
-import { esc, money, icon, iconMark, liftValue, info } from '../ui.js';
+import { esc, money, icon, iconMark, liftValue, info, onSwipe } from '../ui.js';
 
-let pick = null; // タップして選んだ月（'YYYY-MM'）。null なら選んでいない（下は今月のもの）
+let pick = null; // タップ・スワイプで選んだ月（'YYYY-MM'）。null なら選んでいない（下は今月のもの）
+let dir = 0;     // 前の月へ動いたら -1、次の月へなら 1（一覧の入ってくる向き）
 let live = null; // 書き換えたあとも、いまの ctx でシートを開くため
 
 export const morphable = true;
@@ -28,7 +30,7 @@ export function render(ctx) {
   const diff = f.forecast - f.lastMonth;
   const names = C.displayNames(data.rules);
 
-  return `<div class="page fixed-page">
+  return `<div class="page fixed-page" data-dir="${dir}">
     <header class="page-head with-back"><a class="back" href="#/home" aria-label="戻る">${icon('back')}</a><h1>固定費</h1></header>
 
     <section class="card fixed-main">
@@ -43,7 +45,7 @@ export function render(ctx) {
       ${legend(f)}
     </section>
 
-    ${monthSection(data.transactions, f, shown, shown === cur, hidden, names, today)}
+    <div class="month-list" data-key="ml:${shown}">${monthSection(data.transactions, f, shown, shown === cur, hidden, names, today)}</div>
   </div>`;
 }
 
@@ -114,12 +116,25 @@ function monthSection(txs, f, month, isCurrent, hidden, names, today) {
 }
 
 export function mount(root) {
-  root.firstElementChild.addEventListener('click', e => {
+  const page = root.firstElementChild;
+  page.addEventListener('click', e => {
     const el = e.target.closest('[data-month], [data-tx]');
     if (!el) return;
-    if (el.dataset.month) { pick = pick === el.dataset.month ? null : el.dataset.month; live.rerender(); }
+    if (el.dataset.month) { pick = pick === el.dataset.month ? null : el.dataset.month; dir = 0; live.rerender(); }
     else live.openDetail(el.dataset.tx);
   });
+  onSwipe(page.querySelector('.fixed-chart'), step);
+}
+
+/** 選ぶ月を前後に1つ動かす（グラフにある月の中だけ。端より先へは動かない）。 */
+function step(d) {
+  const months = C.fixedSummary(live.data.transactions, live.data.categories, live.data.rules, live.today).months.map(m => m.month);
+  const i = months.indexOf(pick || C.ym(live.today));
+  const next = months[i + d];
+  if (i < 0 || !next) return;
+  pick = next;
+  dir = d;
+  live.rerender();
 }
 
 export function after(root) {
