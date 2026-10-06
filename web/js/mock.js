@@ -11,6 +11,16 @@ const nextMonth = (date) => {
   return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
 };
 
+// 月末（back か月前）。資産の見本の記録日
+const monthEnd = back => {
+  const x = new Date(today.getFullYear(), today.getMonth() - back + 1, 0);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+};
+const assetRows = (back, bank, nisa, principal) => [
+  { date: monthEnd(back), item: '楽天銀行', amount: bank, principal: null },
+  { date: monthEnd(back), item: '楽天証券 NISA', amount: nisa, principal },
+];
+
 let seq = 0;
 function tx(offset, merchant, amount, category, extra = {}) {
   const date = d(offset);
@@ -59,7 +69,8 @@ const DB = {
     { merchant: 'SAMPLE MART', category: '食費', displayName: '' }, { merchant: 'JR EAST', category: '交通費', displayName: '' },
     { merchant: 'APPLE COM BILL', category: 'サブスク', displayName: 'Apple One' },
   ],
-  budgets: [{ month: '', target: '全体', amount: 50000 }], assets: [],
+  budgets: [{ month: '', target: '全体', amount: 50000 }],
+  assets: [...assetRows(3, 182000, 61200, 60000), ...assetRows(2, 176500, 70300, 70000), ...assetRows(1, 190300, 81900, 80000)],
   settings: { weekStart: '月', lastIngest: `${d(0)} 06:12`, unreadableMails: 0 },
 };
 
@@ -90,6 +101,15 @@ export async function mockCall(action, p) {
     case 'setMemo': find(p.id).memo = p.memo; return { id: p.id };
     case 'deleteManual': case 'resolveSokuho': find(p.id).status = '取消'; return { id: p.id };
     case 'setSetting': DB.settings.weekStart = p.value; return p;
+    case 'setAssetRecord': {
+      const put = (item, amount, principal) => {
+        DB.assets = DB.assets.filter(a => !(a.date === p.date && a.item === item));
+        if (amount !== null) DB.assets.push({ date: p.date, item, amount, principal });
+      };
+      put('楽天銀行', p.bank, null);
+      put('楽天証券 NISA', p.nisa, p.nisaPrincipal);
+      return { date: p.date };
+    }
     case 'setBudget': {
       DB.budgets = DB.budgets.filter(b => !(b.target === '全体' && b.month === p.month));
       if (p.amount !== null) DB.budgets.push({ month: p.month, target: '全体', amount: p.amount });

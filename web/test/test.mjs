@@ -117,6 +117,44 @@ test('予算の様子：使いすぎたら over、1日あたりは 0', () => {
   assert.deepStrictEqual([s.remaining, s.over, s.perDay, s.daysLeft, s.pace], [-2000, true, 0, 1, 10000]);
 });
 
+const asset = (date, item, amount, principal = null) => ({ date, item, amount, principal });
+
+test('資産：記録日ごとの合計。記録しなかった項目は前の金額を使う。月ごとはその月の最後の記録', () => {
+  const h = C.assetHistory([asset('2026-09-30', '楽天銀行', 100000), asset('2026-09-30', '楽天証券 NISA', 50000, 48000),
+    asset('2026-10-31', '楽天銀行', 90000), asset('2026-10-15', '楽天証券 NISA', 61000, 58000)]);
+  assert.deepStrictEqual(h.map(x => [x.date, x.total]), [['2026-09-30', 150000], ['2026-10-15', 161000], ['2026-10-31', 151000]]);
+  assert.deepStrictEqual([h[2].bank, h[2].nisa, h[2].now.nisa, h[2].now.principal], [90000, null, 61000, 58000]);
+  assert.deepStrictEqual(C.assetMonthly(h).map(m => [m.month, m.total]), [['2026-09', 150000], ['2026-10', 151000]]);
+});
+
+test('NISA の損益：評価額 − 元本。元本がなければ出さない', () => {
+  assert.deepStrictEqual(C.nisaGain(130000, 120000), { amount: 10000, ratio: 10000 / 120000 });
+  assert.strictEqual(C.nisaGain(130000, null), null);
+});
+
+test('残高：楽天銀行の記録から、記録した日より後〜次の引き落とし日までの引き落としを引く', () => {
+  const txs = [tx('2026-09-10', 3000, { payMonth: '2026-10' }), tx('2026-10-05', 5000, { payMonth: '2026-11' }),
+    tx('2026-10-06', 999, { payMonth: '', source: '手入力', status: '手入力' })];
+  // 10/31 に記録（10/27 の分はもう引かれている）→ 11/5 には 11/27 の分だけ引く
+  const a = C.spendable(txs, [asset('2026-10-31', '楽天銀行', 100000)], D(2026, 11, 5));
+  assert.deepStrictEqual([a.amount, a.debits.map(d => d.payMonth)], [95000, ['2026-11']]);
+  // 10/20 に記録 → 10/28 には、記録のあとの 10/27 の分と、次の 11/27 の分を引く
+  const b = C.spendable(txs, [asset('2026-09-30', '楽天銀行', 1), asset('2026-10-20', '楽天銀行', 100000)], D(2026, 10, 28));
+  assert.deepStrictEqual([b.amount, b.bankDate, b.debits.map(d => C.ymd(d.date))], [92000, '2026-10-20', ['2026-10-27', '2026-11-27']]);
+  // 10/27 当日の記録は、その日の引き落としを引いたあととみなす
+  assert.strictEqual(C.spendable(txs, [asset('2026-10-27', '楽天銀行', 100000)], D(2026, 10, 27)).amount, 100000);
+  assert.strictEqual(C.spendable(txs, [asset('2026-10-27', '楽天証券 NISA', 1)], D(2026, 10, 27)), null);
+});
+
+test('「資産を記録する」：25日〜月末は今月、1〜7日は先月（記録日は先月末）。前の25日から記録があれば出さない', () => {
+  assert.deepStrictEqual(C.assetDue([], D(2026, 10, 25)), { label: '今月の資産を記録する', date: '2026-10-25' });
+  assert.deepStrictEqual(C.assetDue([], D(2026, 11, 3)), { label: '先月の資産を記録する', date: '2026-10-31' });
+  assert.strictEqual(C.assetDue([], D(2026, 10, 10)), null);
+  assert.strictEqual(C.assetDue([asset('2026-10-28', '楽天銀行', 1)], D(2026, 11, 3)), null);
+  assert.deepStrictEqual(C.assetDue([asset('2026-10-20', '楽天銀行', 1)], D(2026, 11, 3)).label, '先月の資産を記録する');
+  assert.deepStrictEqual(C.assetDue([], D(2026, 1, 5)).date, '2025-12-31');
+});
+
 test('金額の書き方', () => {
   assert.strictEqual(C.yen(1234567), '¥1,234,567');
 });

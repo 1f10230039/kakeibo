@@ -239,6 +239,42 @@ test('setBudget：月・金額の形が違えば断る', () => {
   assert.strictEqual(store.tables['予算'].length, 0);
 });
 
+// ---- 資産 ----
+test('setAssetRecord：楽天銀行と NISA（評価額・元本）を1回で記録する。getData で返る', () => {
+  const { call, store } = setup();
+  const r = call({ key: KEY, action: 'setAssetRecord', params: { date: '2026-10-31', bank: 123456, nisa: 130000, nisaPrincipal: 120000 } });
+  assert.strictEqual(r.ok, true);
+  assert.deepStrictEqual(store.tables['資産'].map(x => [x['記録日'], x['項目'], x['金額'], x['元本']]),
+    [['2026-10-31', '楽天銀行', 123456, ''], ['2026-10-31', '楽天証券 NISA', 130000, 120000]]);
+  assert.deepStrictEqual(call({ key: KEY, action: 'getData', params: { from: '2026-01', to: '2026-12' } }).data.assets, [
+    { date: '2026-10-31', item: '楽天銀行', amount: 123456, principal: null },
+    { date: '2026-10-31', item: '楽天証券 NISA', amount: 130000, principal: 120000 },
+  ]);
+});
+test('setAssetRecord：同じ日はやり直しで書き換え（行は増やさない）。null の項目はやめる。0 円は記録として残る', () => {
+  const { call, store } = setup();
+  call({ key: KEY, action: 'setAssetRecord', params: { date: '2026-10-31', bank: 123456, nisa: 130000, nisaPrincipal: 120000 } });
+  assert.strictEqual(call({ key: KEY, action: 'setAssetRecord', params: { date: '2026-10-31', bank: 0, nisa: null, nisaPrincipal: null } }).ok, true);
+  assert.strictEqual(store.tables['資産'].length, 2);
+  assert.deepStrictEqual(call({ key: KEY, action: 'getData', params: { from: '2026-01', to: '2026-12' } }).data.assets,
+    [{ date: '2026-10-31', item: '楽天銀行', amount: 0, principal: null }]);
+  call({ key: KEY, action: 'setAssetRecord', params: { date: '2026-10-31', bank: null, nisa: null, nisaPrincipal: null } });
+  assert.deepStrictEqual(call({ key: KEY, action: 'getData', params: { from: '2026-01', to: '2026-12' } }).data.assets, []);
+  call({ key: KEY, action: 'setAssetRecord', params: { date: '2026-11-30', bank: null, nisa: null, nisaPrincipal: null } }); // ない日をやめても行は足さない
+  assert.strictEqual(store.tables['資産'].length, 2);
+});
+test('setAssetRecord：日付・金額の形が違えば断る。元本だけは入れられない', () => {
+  const { call, store } = setup();
+  const ok = { date: '2026-10-31', bank: 1, nisa: 1, nisaPrincipal: 1 };
+  for (const bad of [{ date: '2026-02-30' }, { date: '10/31' }, { bank: -1 }, { bank: 1.5 }, { bank: '1000' }, { nisa: 1000000001 }, { bank: undefined },
+    { nisa: null, nisaPrincipal: 5 }]) {
+    const params = { ...ok, ...bad };
+    if ('bank' in bad && bad.bank === undefined) delete params.bank;
+    assert.strictEqual(call({ key: KEY, action: 'setAssetRecord', params }).ok, false, JSON.stringify(bad));
+  }
+  assert.strictEqual(store.tables['資産'].length, 0);
+});
+
 // ---- 中の失敗 ----
 test('シートの読み書きで失敗しても、中身を漏らさず決まった文だけ返す', () => {
   const broken = { rows() { throw new Error('秘密のパス /x/y'); }, update() {}, append() {} };

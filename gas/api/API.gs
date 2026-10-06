@@ -15,6 +15,8 @@
 const MAX_AUTH_FAILS_PER_HOUR = 10;
 const MIN_KEY_LENGTH = 32;
 const WRITABLE_SETTINGS = { '週の始まり': ['月', '日'] };
+const ASSET_ITEMS = { bank: '楽天銀行', nisa: '楽天証券 NISA' }; // 資産の項目（10/6 本人「この2つ」）
+const MAX_ASSET = 1000000000;
 
 /** 呼んだ人に見せてよい失敗（合言葉が正しいときだけ返る）。 */
 class UserError extends Error {}
@@ -132,7 +134,9 @@ const ACTIONS = {
       budgets: store.rows(SHEET.BUDGET)
         .filter(r => r['金額'] !== '' && Number(r['金額']) > 0) // 金額が空の行は「やめた予算」
         .map(r => ({ month: r['月'], target: r['対象'], amount: Number(r['金額']) })),
-      assets: store.rows(SHEET.ASSETS).map(r => ({ date: r['記録日'], item: r['項目'], amount: Number(r['金額']) })),
+      assets: store.rows(SHEET.ASSETS)
+        .filter(r => r['金額'] !== '' && r['金額'] !== undefined) // 金額が空の行は「やめた記録」。0 円は記録として残す
+        .map(r => ({ date: r['記録日'], item: r['項目'], amount: Number(r['金額']), principal: r['元本'] === '' || r['元本'] === undefined ? null : Number(r['元本']) })),
       settings: {
         weekStart: settings['週の始まり'] || '月',
         lastIngest: settings['最終取り込み'] || '',
@@ -251,6 +255,29 @@ const ACTIONS = {
     if (row) { row['金額'] = amount === null ? '' : amount; store.update(SHEET.BUDGET, row); }
     else if (amount !== null) store.append(SHEET.BUDGET, [{ '月': month, '対象': '全体', '金額': amount }]);
     return { month, amount };
+  },
+
+  /**
+   * 資産の記録（F-33）。月1回、本人が楽天銀行の残高と、楽天証券 NISA の評価額・元本（積み立てた額）を写す。
+   * 同じ記録日・項目の行があれば書き換え、なければ足す。null の項目は、その日の行をやめる（金額を空に。行は消さない）。
+   * 3つとも null なら、その日の記録をやめることになる。
+   */
+  setAssetRecord({ date, bank, nisa, nisaPrincipal }, { store }) {
+    checkDate(date);
+    for (const [name, v] of [['bank', bank], ['nisa', nisa], ['nisaPrincipal', nisaPrincipal]]) {
+      if (v !== null && (!Number.isInteger(v) || v < 0 || v > MAX_ASSET)) throw new UserError(`${name} は 0〜1,000,000,000 の整数か、null にしてください`);
+    }
+    if (nisa === null && nisaPrincipal !== null) throw new UserError('nisaPrincipal は nisa と一緒に入れてください');
+    const rows = store.rows(SHEET.ASSETS);
+    const put = (item, amount, principal) => {
+      const row = rows.find(r => r['記録日'] === date && r['項目'] === item);
+      const values = { '金額': amount === null ? '' : amount, '元本': principal === null ? '' : principal };
+      if (row) store.update(SHEET.ASSETS, Object.assign(row, values));
+      else if (amount !== null) store.append(SHEET.ASSETS, [Object.assign({ '記録日': date, '項目': item }, values)]);
+    };
+    put(ASSET_ITEMS.bank, bank, null);
+    put(ASSET_ITEMS.nisa, nisa, nisaPrincipal);
+    return { date };
   },
 
   setSetting({ key, value }, { store }) {

@@ -96,3 +96,5 @@ export const resolveSokuho = (id) => call('resolveSokuho', { id });
 export const setSetting = (key, value) => call('setSetting', { key, value });
 /** 予算。month：'' なら毎月、'YYYY-MM' ならその月だけ。amount：null ならやめる。 */
 export const setBudget = (month, amount) => call('setBudget', { month, amount });
+/** 資産の記録。金額は整数か null（その項目は記録しない／やめる）。3つとも null ならその日の記録をやめる。 */
+export const setAssetRecord = (date, bank, nisa, nisaPrincipal) => call('setAssetRecord', { date, bank, nisa, nisaPrincipal });

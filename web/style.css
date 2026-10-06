@@ -314,13 +314,58 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
 .meter-legend { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ink2); }
 .meter-note { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 12px; font-size: 11px; color: var(--ink2); }
 .pace-mark { width: 2px; height: 12px; border-radius: 1px; background: var(--ink); opacity: .45; }
-.budget-empty { margin: 10px 20px 0; padding: 28px 22px; text-align: center; color: var(--ink2); font-size: 14px; line-height: 1.8; }
-.budget-empty p { margin: 0 0 16px; }
+.budget-empty, .asset-empty { margin: 10px 20px 0; padding: 28px 22px; text-align: center; color: var(--ink2); font-size: 14px; line-height: 1.8; }
+:is(.budget-empty, .asset-empty) p { margin: 0 0 16px; }
 .budget .row .a { margin-left: auto; }
 .budget-mini { display: block; }
 .budget-line { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--ink2); }
 .budget-line .money { color: var(--ink); font-family: var(--font-num); font-weight: var(--num-weight); font-size: 16px; }
 .budget-mini.over .budget-line, .budget-mini.over .budget-line .money { color: var(--warn); }
+
+/* ---- 資産 ---- */
+.asset-main { margin: 10px 20px 0; padding: 26px 24px 20px; text-align: center; border-radius: 28px; box-shadow: 0 10px 40px rgba(0,0,0,.06); }
+.asset-items { display: grid; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); text-align: left; }
+.asset-item { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.asset-item > span:nth-child(2) { flex: 1; }
+.asset-item .money { font-family: var(--font-num); font-weight: var(--num-weight); font-size: 19px; }
+.mark-dot { width: 10px; height: 10px; border-radius: 3px; background: currentColor; flex-shrink: 0; }
+.asset-gain { font-size: 12px; color: var(--ink2); text-align: right; }
+.pos { color: var(--accent); } .neg { color: var(--warn); }
+.asset-chart { margin: 14px 20px 0; padding: 18px 14px 10px; }
+.chart-head { display: flex; justify-content: space-between; align-items: baseline; padding: 0 6px; }
+.chart-head h2 { font-family: var(--font-head); font-weight: 500; font-size: 16px; margin: 0; letter-spacing: .06em; }
+.chart-head .sel { font-size: 12px; color: var(--ink2); }
+.chart-note { font-size: 13px; color: var(--ink2); text-align: center; margin: 0; padding: 24px 0 16px; }
+/* 折れ線：pathLength="1" にしておき、線の見える長さを 0→1 にして「描かれていく」ように出す */
+.line-chart { display: block; width: 100%; height: auto; margin-top: 2px; overflow: visible; }
+.line-chart .line { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-dasharray: 1; animation: draw 1.4s var(--ease) both; }
+.line-chart .area { fill: url(#asset-area); stroke: none; animation: fade-in 1s .5s both; }
+.line-chart .stop-a { stop-color: var(--accent); stop-opacity: .22; }
+.line-chart .stop-b { stop-color: var(--accent); stop-opacity: 0; }
+.pt { cursor: pointer; }
+.pt .hit { fill: transparent; stroke: none; }
+.pt .dot { fill: var(--card); stroke: var(--accent); stroke-width: 2; transform-box: fill-box; transform-origin: center;
+  transition: transform .4s var(--spring), fill .3s; animation: pop-in .45s var(--spring) both; animation-delay: calc(.6s + var(--i, 0) * 70ms); }
+.pt.on .dot { fill: var(--accent); transform: scale(1.5); }
+.pt .mlab { fill: var(--ink2); stroke: none; font-size: 10.5px; text-anchor: middle; font-family: var(--font-body); }
+.tip { animation: fade-in .35s var(--ease) both; }
+.tip text { fill: var(--ink); stroke: none; font-size: 13px; text-anchor: middle; font-family: var(--font-num); font-weight: 600; }
+@keyframes draw { from { stroke-dashoffset: 1; } }
+.asset-spend { margin: 14px 20px 0; padding: 18px 20px 16px; }
+.spend-lines { display: grid; gap: 7px; margin-top: 10px; font-size: 13px; }
+.spend-lines > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.spend-lines .money { font-family: var(--font-num); font-weight: var(--num-weight); font-size: 16px; white-space: nowrap; }
+.spend-lines .sum { border-top: 1px solid var(--line); padding-top: 9px; margin-top: 2px; font-weight: 500; }
+.spend-lines .sum .money { font-size: 21px; }
+.note-s { font-size: 11px; color: var(--ink2); margin: 10px 0 0; line-height: 1.6; }
+.mini .asset-total { font-size: 11px; color: var(--ink2); margin-top: 6px; }
+.mini .asset-total .money { color: var(--ink); font-family: var(--font-num); font-weight: var(--num-weight); font-size: 13px; }
+/* 記録のシート：金額の欄を3つ並べるので、少し小さく */
+.asset-field .sheet-label { margin-top: 14px; }
+.amount-input.small { padding: 10px 14px; }
+.amount-input.small span { font-size: 20px; }
+.amount-input.small input { font-size: 30px; }
+.asset-field .before { min-height: 1em; font-size: 11px; color: var(--ink2); margin: 5px 4px 0; text-align: right; }
 
 /* ---- 未分類の振り分け ---- */
 .progress { margin: 4px 24px 10px; font-size: 12px; color: var(--ink2); }
@@ -332,7 +377,6 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
 .sorter .picker-group + .picker-group { margin-top: 12px; }
 .sorter .pick { padding: 12px 16px; font-size: 14px; }
 
-.soon-card { margin: 20px; padding: 28px 22px; text-align: center; color: var(--ink2); font-size: 14px; }
 
 /* ---- タブバー ---- */
 /* 4つのタブを同じ幅で並べ、選んでいるタブの後ろの丸い背景（.tab-pill）が、タブを替えるとすべって動く */
@@ -404,7 +448,7 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
   .home-side .section:first-child { margin-top: 0; }
   .stats-body { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
   .stats-body .tx-list .section { margin-top: 0; }
-  .budget.page { max-width: 560px; }
+  .budget.page, .assets.page { max-width: 560px; }
   .sheet { left: 50%; right: auto; bottom: 50%; width: 480px; border-radius: 26px; transform: translate(-50%, 60%); opacity: 0; transition: transform .4s var(--sheet), opacity .3s; }
   .sheet-wrap.open .sheet { transform: translate(-50%, 50%); opacity: 1; }
   .toast { bottom: 32px; }

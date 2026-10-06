@@ -94,8 +94,12 @@ export function nextDebit(txs, today) {
   let d = debitDate(today.getFullYear(), today.getMonth());
   if (ymd(today) > ymd(d)) d = debitDate(today.getFullYear(), today.getMonth() + 1);
   const payMonth = ym(new Date(d.getFullYear(), d.getMonth(), 1));
-  const amount = sum(txs.filter(t => isSpend(t) && t.source === 'メール' && t.payMonth === payMonth));
-  return { date: d, payMonth, amount };
+  return { date: d, payMonth, amount: debitAmount(txs, payMonth) };
+}
+
+/** その支払月（YYYY-MM）の引き落とし額。 */
+function debitAmount(txs, payMonth) {
+  return sum(txs.filter(t => isSpend(t) && t.source === 'メール' && t.payMonth === payMonth));
 }
 
 /** カテゴリごとの合計（多い順、0円は出さない）。 */
@@ -221,6 +225,79 @@ export function budgetStatus(txs, amount, today) {
     pace: Math.round((amount * day) / days),
     perDay: remaining > 0 ? Math.floor(remaining / daysLeft) : 0,
   };
+}
+
+// ---- 資産（段階③。楽天銀行と楽天証券 NISA を月1回手で記録する） ----
+
+export const ASSET = { bank: '楽天銀行', nisa: '楽天証券 NISA' };
+
+/**
+ * 記録日ごとの資産。その日に記録しなかった項目は、前に記録した金額をそのまま使う（合計が急に減って見えないように）。
+ * 返すもの（古い順）：{ date, bank, nisa, principal（その日に入れた値。入れていなければ null）,
+ *                      now: { bank, nisa, principal }（前の記録も使った値）, total }
+ */
+export function assetHistory(assets) {
+  const dates = [...new Set((assets || []).map(a => a.date))].sort();
+  const now = { bank: null, nisa: null, principal: null };
+  return dates.map(date => {
+    const b = assets.find(a => a.date === date && a.item === ASSET.bank);
+    const n = assets.find(a => a.date === date && a.item === ASSET.nisa);
+    if (b) now.bank = b.amount;
+    if (n) { now.nisa = n.amount; now.principal = n.principal; }
+    return { date, bank: b ? b.amount : null, nisa: n ? n.amount : null, principal: n ? n.principal : null,
+      now: { ...now }, total: (now.bank || 0) + (now.nisa || 0) };
+  });
+}
+
+/** 月ごとの資産の合計（その月の最後の記録）。グラフ用。 */
+export function assetMonthly(history) {
+  const byMonth = new Map();
+  history.forEach(h => byMonth.set(h.date.slice(0, 7), { month: h.date.slice(0, 7), date: h.date, total: h.total, now: h.now }));
+  return [...byMonth.values()];
+}
+
+/** NISA の損益（評価額 − 元本）と、元本に対する割合。元本がなければ null。 */
+export function nisaGain(nisa, principal) {
+  if (nisa === null || principal === null || principal === undefined) return null;
+  return { amount: nisa - principal, ratio: principal > 0 ? (nisa - principal) / principal : 0 };
+}
+
+/**
+ * 残高（ホームの「残高」）：楽天銀行のいちばん新しい記録から、記録した日より後〜次の引き落とし日までの
+ * カードの引き落としを引いた額（10/6 本人）。記録した日の引き落としは、もう引かれた金額を記録したとみなす。
+ * ⚠️ 記録したあとの入金（バイト代など）や、カード以外の出入りは入らない。
+ * 返すもの：{ amount, bankDate, bankAmount, debits: [{ date, payMonth, amount }] }。楽天銀行の記録がなければ null。
+ */
+export function spendable(txs, assets, today) {
+  const bank = (assets || []).filter(a => a.item === ASSET.bank).sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+  if (!bank) return null;
+  const next = nextDebit(txs, today);
+  const rec = parseYmd(bank.date);
+  const debits = [];
+  for (let m = new Date(rec.getFullYear(), rec.getMonth(), 1); ym(m) <= next.payMonth; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
+    const d = debitDate(m.getFullYear(), m.getMonth());
+    if (ymd(d) > bank.date && ymd(d) <= ymd(next.date)) debits.push({ date: d, payMonth: ym(m), amount: debitAmount(txs, ym(m)) });
+  }
+  return { amount: bank.amount - sum(debits), bankDate: bank.date, bankAmount: bank.amount, debits };
+}
+
+/**
+ * ホームの「やること」に「資産を記録する」を出すか。25日〜月末は今月の分、1〜7日は先月の分。
+ * その期間（前の25日から）にもう記録があれば出さない。返すもの：{ label, date（記録日の初期値） } か null。
+ */
+export function assetDue(assets, today) {
+  const day = today.getDate();
+  let from, label, date;
+  if (day >= 25) {
+    from = new Date(today.getFullYear(), today.getMonth(), 25);
+    label = '今月の資産を記録する';
+    date = today;
+  } else if (day <= 7) {
+    from = new Date(today.getFullYear(), today.getMonth() - 1, 25);
+    label = '先月の資産を記録する';
+    date = new Date(today.getFullYear(), today.getMonth(), 0); // 先月の末日
+  } else return null;
+  return (assets || []).some(a => a.date >= ymd(from)) ? null : { label, date: ymd(date) };
 }
 
 // ---- 表示 ----

@@ -1,5 +1,4 @@
-// ホーム・統計以外の画面：S-00 合言葉、S-06 未分類の振り分け、確認が必要な速報、S-08 メニュー、S-10 対応表、
-// 予算・資産（準備中）。
+// ホーム・統計・予算・資産以外の画面：S-00 合言葉、S-06 未分類の振り分け、確認が必要な速報、S-08 メニュー、S-10 対応表。
 
 import * as C from '../calc.js';
 import * as api from '../api.js';
@@ -186,11 +185,3 @@ export const rules = {
     });
   },
 };
-
-// ---- 予算・資産（準備中） ----
-
-export const soon = (title, stage) => ({
-  render: () => `<div class="page soon-page"><header class="page-head"><h1>${esc(title)}</h1></header>
-    <div class="soon-card card"><p>${esc(title)}の画面は段階${stage}で作ります。</p></div></div>`,
-  mount() {},
-});

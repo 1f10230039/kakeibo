@@ -3,7 +3,7 @@
 
 import * as C from '../calc.js';
 import { CATEGORY_PHOTO, categoryIcon } from '../icons.js';
-import { esc, money, iconMark, icon, seg } from '../ui.js';
+import { esc, money, signedMoney, iconMark, icon, seg } from '../ui.js';
 import { meter } from './budget.js';
 
 let topRange = 'week'; // 支出トップの期間：'week'（今週）／'month'（今月）
@@ -19,6 +19,9 @@ export function render(ctx) {
   const debit = C.nextDebit(txs, today);
   const budget = C.budgetFor(data.budgets, C.ym(today));
   const bs = budget && C.budgetStatus(txs, budget.amount, today);
+  const sp = C.spendable(txs, data.assets, today);
+  const assetsNow = C.assetHistory(data.assets).at(-1);
+  const assetDue = C.assetDue(data.assets, today);
 
   const unclassified = C.unclassified(txs).length;
   const stale = C.staleSokuho(txs, today).length;
@@ -53,8 +56,11 @@ export function render(ctx) {
       </section>
 
       <div class="pair">
-        <div class="mini card"><div class="label">収入</div><div class="num muted">—</div><div class="soon">段階③から</div></div>
-        <div class="mini card"><div class="label">残高</div><div class="num muted">—</div><div class="soon">段階③から</div></div>
+        <div class="mini card"><div class="label">収入</div><div class="num muted">—</div><div class="soon">準備中</div></div>
+        <a class="mini card" href="#/assets"><div class="label">残高</div>
+          <div class="num">${sp ? signedMoney(sp.amount, hidden) : '<span class="muted">—</span>'}</div>
+          <div class="soon">${sp ? 'カード代を引いた額' : '資産を記録すると出ます'}</div>
+          ${assetsNow ? `<div class="asset-total">資産の合計 ${money(assetsNow.total, hidden)}</div>` : ''}</a>
       </div>
 
       <div class="due"><span>${esc(C.mdw(debit.date))} 引き落とし予定</span><span class="num">${money(debit.amount, hidden)}</span></div>
@@ -63,6 +69,7 @@ export function render(ctx) {
         ${unclassified ? `<a class="chip" href="#/unclassified"><span class="dot"></span>未分類が${unclassified}件</a>` : ''}
         ${stale ? `<a class="chip" href="#/stale"><span class="dot"></span>確認が必要な速報が${stale}件</a>` : ''}
         ${unreadable ? `<a class="chip" href="#/menu"><span class="dot"></span>読めなかったメールが${unreadable}通</a>` : ''}
+        ${assetDue ? `<button class="chip" data-act="asset" data-date="${assetDue.date}"><span class="dot"></span>${assetDue.label}</button>` : ''}
         ${budget ? '' : `<a class="chip" href="#/budget">${icon('budget')}予算を決める</a>`}
         <button class="chip primary" data-act="manual">${icon('plus')}記録する</button>
       </div>
@@ -101,6 +108,7 @@ export function mount(root, ctx) {
     const d = el.dataset;
     if (d.act === 'hide') ctx.toggleHidden();
     else if (d.act === 'manual') ctx.openManual();
+    else if (d.act === 'asset') ctx.openAsset(d.date);
     else if (d.range && d.range !== topRange) {
       topRange = d.range;
       ctx.rerender();

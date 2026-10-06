@@ -15,6 +15,11 @@ export function money(n, hidden, count = '') {
   return `<span class="money" data-key="v"${count ? ` data-count="${esc(count)}" data-n="${Number(n) || 0}"` : ''}>${esc(yen(n))}</span>`;
 }
 
+/** マイナスもありうる金額（残高など）。マイナスは「−¥1,234」を注意の色で。 */
+export function signedMoney(n, hidden) {
+  return n < 0 && !hidden ? `<span class="neg">−${money(-n, hidden)}</span>` : money(n, hidden);
+}
+
 /** 切り替えボタン（白い背景が、選んだほうへすべって動く）。items：[[値, 表示], …]。押すと data-<attr> の値が分かる。 */
 export function seg(attr, items, current, label) {
   const i = Math.max(0, items.findIndex(([v]) => v === current));
