@@ -1,8 +1,8 @@
 /* 家計簿の見た目。色と文字は時間帯で3つのテーマを切り替える（js/theme.js）。
    A 朝の光（朝・夕方）／B 森と余白（昼）／C 夜の静けさ（夜）。docs/design/home_3案.html と同じ値。 */
 
-/* タブバーのアイコンの並びの下の空き。iPhone（下の余白 34px）では下から 48px。余白のない画面では 14px */
-:root { --tab-bottom: calc(env(safe-area-inset-bottom) + 14px);
+/* --tab-top：タブバーの上のふちの、画面の下からの高さ（空き 24px＋バー 68px）。ページの最後や、お知らせをこの上に置く */
+:root { --tab-top: calc(var(--edge) + 68px);
   /* 画面の角の丸み。iPhone 16 は 55pt（ScreenCorners の一覧。CSS からは読めないので数字で持つ）。
      --edge はタブバーと画面のふちの空き（左右と下でそろえる） */
   --screen-r: 55px; --edge: 24px;
@@ -56,7 +56,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
    iPhone のホーム画面アプリ（写真をステータスバーの下まで広げる設定）では、スクロールしないページのときだけ、
    下に固定したタブバーがステータスバーの高さ（指1本分）だけ上にずれた（10/6 本人の iPhone。ホームだけ正しかった）。
    「ちょうど画面いっぱい」ではまだずれたので、ステータスバーの高さ＋1px だけ長くする。 */
-#app { max-width: 480px; margin: 0 auto; padding-bottom: calc(84px + var(--tab-bottom));
+#app { max-width: 480px; margin: 0 auto; padding-bottom: calc(var(--tab-top) + 24px);
   min-height: calc(100vh + env(safe-area-inset-top) + 1px); overflow-x: clip; /* 横から入ってくる動きの間、横にはみ出さない */ }
 .card { background: var(--card); border-radius: 24px; }
 .label { font-size: 12px; letter-spacing: .14em; color: var(--ink2); }
@@ -313,14 +313,12 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
 
 /* ---- タブバー ---- */
 /* 4つのタブを同じ幅で並べ、選んでいるタブの後ろの丸い背景（.tab-pill）が、タブを替えるとすべって動く */
-/* 形：左右と下のふちとの空きを --edge にそろえ、下の角は画面の角と同じ中心で丸める（半径＝画面の角 − 空き）。
-   アイコンの並びは下から --tab-bottom の高さ（iPhone では 48px）に置き、その下（ホームバーのところ）はバーを伸ばして埋める。
-   下に余白がない画面（Safari のタブなど）では、伸ばす分が 0 になり、ふつうの丸いバーになる。
-   10/6：「ホーム画面アプリのときだけこの形」と JS で見分けていたが、本人の iPhone では見分けられず、前の形のままだった。
-   なので見分けをやめ、どこでもこの形にした */
-.tabbar { --tab-i: 0; --tab-pad: max(0px, calc(var(--tab-bottom) - var(--edge)));
+/* 形：左右と下のふちとの空きを --edge（24px）にそろえ、下の角は画面の角と同じ中心で丸める（半径＝画面の角 − 空き＝31px）。
+   10/6：「ホーム画面アプリのときだけこの形」と JS で見分けていたが、本人の iPhone では見分けられず前の形のままだったので、見分けはやめた。
+   バーの中の下側をホームバーの分だけ伸ばす形も試したが、アイコンが下がらず「下の余白が広いまま」だったので、ふつうの高さにした */
+.tabbar { --tab-i: 0;
   position: fixed; z-index: 10; left: var(--edge); right: var(--edge); bottom: var(--edge); max-width: 448px; margin: 0 auto;
-  height: calc(68px + var(--tab-pad)); padding: 0 6px var(--tab-pad); border-radius: 34px 34px calc(var(--screen-r) - var(--edge)) calc(var(--screen-r) - var(--edge));
+  height: 68px; padding: 0 6px; border-radius: 34px 34px calc(var(--screen-r) - var(--edge)) calc(var(--screen-r) - var(--edge));
   background: var(--tab-bg); backdrop-filter: blur(16px) saturate(1.3); -webkit-backdrop-filter: blur(16px) saturate(1.3);
   display: grid; grid-template-columns: repeat(4, 1fr); align-items: start; box-shadow: 0 8px 32px rgba(0,0,0,.10); transition: background-color .4s; }
 .tabbar[hidden] { display: none; }
@@ -335,7 +333,7 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
 .tabbar.no-pill .tab-pill { opacity: 0; }
 
 /* ---- お知らせ・読み込み中 ---- */
-.toast { position: fixed; z-index: 30; left: 50%; bottom: calc(88px + var(--tab-bottom)); transform: translate(-50%, 14px) scale(.92); opacity: 0;
+.toast { position: fixed; z-index: 30; left: 50%; bottom: calc(var(--tab-top) + 14px); transform: translate(-50%, 14px) scale(.92); opacity: 0;
   background: var(--ink); color: var(--bg); padding: 11px 18px; border-radius: 14px; font-size: 13px; transition: opacity .3s, transform .5s var(--spring); max-width: calc(100% - 40px); }
 .toast.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
 .toast.warn { background: var(--warn); color: #fff; }
