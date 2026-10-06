@@ -6,7 +6,7 @@ import { CATEGORY_PHOTO, categoryIcon } from '../icons.js';
 import { esc, money, signedMoney, iconMark, icon, seg } from '../ui.js';
 import { meter } from './budget.js';
 
-let topRange = 'week'; // 支出トップの期間：'week'（今週）／'month'（今月）
+let topRange = 'month'; // 支出トップの期間：'month'（今月。初めはこちら・10/6 本人）／'week'（今週）
 
 export const morphable = true;
 
