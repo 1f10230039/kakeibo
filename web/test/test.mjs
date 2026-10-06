@@ -71,6 +71,14 @@ test('棒ごとの合計', () => {
   assert.deepStrictEqual(t.map(b => b.total), [100, 200, 0, 0, 50]);
 });
 
+test('棒ごとの合計：収入に切り替えると入金だけ（取消は入れない）', () => {
+  const p = C.period('month', 0, D(2026, 10, 6), '月');
+  const inc = (date, amount, extra = {}) => tx(date, amount, { type: '収入', status: '手入力', source: '手入力', category: '', ...extra });
+  const txs = [tx('2026-10-02', 100), inc('2026-10-03', 5000), inc('2026-10-27', 52000), inc('2026-10-28', 1, { status: '取消' })];
+  assert.deepStrictEqual(C.bucketTotals(txs, p, '収入').map(b => b.total), [5000, 0, 0, 0, 52000]);
+  assert.deepStrictEqual(C.bucketTotals(txs, p).map(b => b.total), [100, 0, 0, 0, 0]);
+});
+
 test('カテゴリ・グループの合計（未分類も出す）', () => {
   const cats = [{ name: '食費', group: '暮らし' }, { name: 'サブスク', group: '固定費' }];
   const txs = [tx('2026-10-01', 100), tx('2026-10-02', 300, { category: 'サブスク' }), tx('2026-10-03', 50, { category: '' })];

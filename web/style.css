@@ -16,6 +16,7 @@
   --num-weight: 600;
   --hero-shade: linear-gradient(180deg, rgba(31,42,68,.25) 0%, rgba(31,42,68,0) 35%, rgba(246,242,236,0) 60%, rgba(246,242,236,1) 100%);
   --tab-bg: rgba(255,253,249,.92); --warn: #b5654a;
+  --income-bar: color-mix(in srgb, var(--accent) 38%, var(--card));
 }
 [data-theme="b"] {
   --bg: #fafaf7; --card: #ffffff; --ink: #2b2f2c; --ink2: #7d837e; --line: #e8ebe6;
@@ -25,6 +26,7 @@
   --num-weight: 300;
   --hero-shade: linear-gradient(180deg, rgba(250,250,247,0) 45%, rgba(250,250,247,1) 100%);
   --tab-bg: rgba(255,255,255,.92); --warn: #b97a56;
+  --income-bar: color-mix(in srgb, var(--accent) 45%, var(--card));
 }
 [data-theme="c"] {
   --bg: #121826; --card: #1b2335; --ink: #f1ece2; --ink2: #9aa1b2; --line: #2a3347;
@@ -34,6 +36,7 @@
   --num-weight: 500;
   --hero-shade: linear-gradient(180deg, rgba(18,24,38,.2) 0%, rgba(18,24,38,0) 40%, rgba(18,24,38,1) 100%);
   --tab-bg: rgba(27,35,53,.92); --warn: #d39a9a;
+  --income-bar: color-mix(in srgb, var(--accent) 62%, var(--card)); /* 夜は暗い地なので、金色を濃いめに（30% だとくすんだ茶色に見えた） */
 }
 
 * { box-sizing: border-box; }
@@ -194,6 +197,10 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
 .bar .fill { height: calc(var(--h, 0) * 100%); border-radius: 10px; background: var(--bar);
   transition: height .7s var(--ease) calc(var(--i, 0) * 28ms), background-color .3s; }
 .bar.on .fill { background: var(--accent); }
+/* 収入の棒：支出と同じ場所で、色だけ変える（切り替えると色も高さもなめらかに変わる） */
+.bars.income .fill { background: var(--income-bar); }
+.bars.income .bar.on .fill { background: var(--accent); }
+.chart-total .seg { font-size: 12px; }
 .bar:active .fill { filter: brightness(.94); }
 .bar .val { position: absolute; left: 50%; bottom: calc(var(--h, 0) * 100% + 6px); transform: translateX(-50%); white-space: nowrap;
   font-family: var(--font-num); font-weight: 600; font-size: 12px; transition: bottom .7s var(--ease); animation: pop-in .4s var(--spring) both; }

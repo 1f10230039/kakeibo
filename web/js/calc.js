@@ -168,8 +168,10 @@ export function period(unit, offset, today, weekStart) {
   return { unit, start: new Date(y, 0, 1), end: new Date(y, 11, 31), label: `${y}年`, buckets };
 }
 
-export function bucketTotals(txs, p) {
-  return p.buckets.map(b => ({ ...b, total: sum(spendBetween(txs, b.start, b.end)) }));
+/** 棒ごとの合計。kind：'支出'（初め）か '収入'（統計の切り替え・10/6）。 */
+export function bucketTotals(txs, p, kind = '支出') {
+  const pick = kind === '収入' ? incomeBetween : spendBetween;
+  return p.buckets.map(b => ({ ...b, total: sum(pick(txs, b.start, b.end)) }));
 }
 
 // ---- 名前（サブタイトル） ----

@@ -1,4 +1,5 @@
-// S-02 統計。棒グラフ／円グラフ（切り替えボタン）、左右のスワイプで前後の期間、その下に利用一覧。
+// S-02 統計。棒グラフ／円グラフ（切り替えボタン）、左右のスワイプで前後の期間、その下に一覧。
+// 棒グラフは支出／収入を切り替えられる（10/6 本人「切り替え」）。一覧もグラフに合わせる。円グラフは支出のカテゴリの内訳だけ。
 // 配置は docs/02_画面設計.md の S-02。
 // 切り替えでは作り直さず、変わったところだけ書き換える（morphable）。棒は前の高さから新しい高さへ伸び縮みし、
 // 円は前の割合から新しい割合へ動く（初めて出たときは、ぐるっと描かれる）。
@@ -10,7 +11,7 @@ import { row } from './home.js';
 import { incomeRow } from './income.js';
 
 const UNIT_NAME = { week: '週', month: '月', year: '年' };
-const view = { unit: 'month', offset: 0, chart: 'bar', bucket: null, group: null, cat: null, dir: 0 };
+const view = { unit: 'month', offset: 0, chart: 'bar', flow: '支出', bucket: null, group: null, cat: null, dir: 0 };
 
 export const morphable = true;
 
@@ -29,21 +30,17 @@ export function render(ctx) {
   const groupOf = name => (!name || name === '未分類' ? '未分類' : (data.categories.find(c => c.name === name) || { group: 'その他' }).group);
   if (view.cat && !view.group) view.group = groupOf(view.cat); // カテゴリから来たら、そのグループの内訳を開いておく
 
-  // 一覧の絞り込み：棒（期間の一部）／グループ／カテゴリ
-  let list = inPeriod, filterLabel = '';
+  const incomesInPeriod = C.incomeBetween(data.transactions, p.start, p.end);
+  const showIncome = view.chart === 'bar' && view.flow === '収入';
+  const pick = showIncome ? C.incomeBetween : C.spendBetween;
+
+  // 一覧の絞り込み：棒（期間の一部）／グループ／カテゴリ。一覧はグラフに合わせて、支出か収入のどちらか
+  let list = showIncome ? incomesInPeriod : inPeriod, filterLabel = '';
   if (view.chart === 'bar' && view.bucket !== null && p.buckets[view.bucket]) {
     const b = p.buckets[view.bucket];
-    list = C.spendBetween(list, b.start, b.end);
+    list = pick(list, b.start, b.end);
     filterLabel = view.unit === 'week' ? `${b.sub}（${b.label}）` : view.unit === 'month' ? `${b.label}（${b.sub}）` : b.label;
   }
-  // 収入も一覧に出す（支出と区別して）。カテゴリやグループで絞り込んでいるときは出さない
-  let incomes = C.incomeBetween(data.transactions, p.start, p.end);
-  const incomeTotal = C.sum(incomes);
-  if (view.chart === 'bar' && view.bucket !== null && p.buckets[view.bucket]) {
-    const b = p.buckets[view.bucket];
-    incomes = C.incomeBetween(incomes, b.start, b.end);
-  }
-  if (view.chart === 'pie' && (view.cat || view.group)) incomes = [];
   if (view.chart === 'pie' && view.cat) {
     list = list.filter(t => (t.category || '未分類') === view.cat);
     filterLabel = view.cat;
@@ -67,23 +64,27 @@ export function render(ctx) {
 
     <div class="stats-body">
       <section class="chart card" id="chart">
-        <div class="chart-total"><span class="label">支出の合計</span>${money(C.sum(inPeriod), hidden, 'stats-total')}</div>
-        ${incomeTotal ? `<div class="chart-income" data-key="inc"><span class="label">収入</span><span class="pos">+${money(incomeTotal, hidden)}</span></div>` : ''}
-        ${view.chart === 'bar' ? barChart(C.bucketTotals(data.transactions, p), hidden) : pieChart(C.groupTotals(inPeriod, data.categories), hidden)}
+        ${view.chart === 'bar'
+          ? `<div class="chart-total">${seg('flow', [['支出', '支出'], ['収入', '収入']], view.flow, 'グラフに出すもの')}${money(C.sum(showIncome ? incomesInPeriod : inPeriod), hidden, 'stats-total')}</div>
+             ${barChart(C.bucketTotals(data.transactions, p, view.flow), hidden, showIncome)}`
+          : `<div class="chart-total"><span class="label">支出の合計</span>${money(C.sum(inPeriod), hidden, 'stats-total')}</div>
+             ${incomesInPeriod.length ? `<div class="chart-income" data-key="inc"><span class="label">収入</span><span class="pos">+${money(C.sum(incomesInPeriod), hidden)}</span></div>` : ''}
+             ${pieChart(C.groupTotals(inPeriod, data.categories), hidden)}`}
       </section>
 
       <section class="tx-list">
         <div class="section"><h2>一覧</h2>${filterLabel ? `<button class="chip filter" data-key="${esc(filterLabel)}" data-act="clear">${esc(filterLabel)}で絞り込み中 ${icon('close')}</button>` : ''}</div>
-        ${list.length || incomes.length ? byDate([...list, ...incomes], groupOf, hidden, C.displayNames(data.rules)) : '<p class="empty">この期間の利用はありません</p>'}
+        ${list.length ? byDate(list, groupOf, hidden, C.displayNames(data.rules)) : `<p class="empty">この期間の${showIncome ? '収入' : '利用'}はありません</p>`}
       </section>
     </div>
   </div>`;
 }
 
 /** 棒グラフ。高さは --h（0〜1）で、CSS が前の高さから新しい高さへ動かす。初めて出た棒は 0 から伸びる（data-from）。 */
-function barChart(buckets, hidden) {
+function barChart(buckets, hidden, income = false) {
   const max = Math.max(1, ...buckets.map(b => b.total));
-  return `<div class="bars${buckets.length > 7 ? ' many' : ''}" data-key="bar" role="group" aria-label="支出の棒グラフ">${buckets.map((b, i) => {
+  // 支出と収入で同じ data-key にして、切り替えると棒が今の高さから伸び縮みするようにする
+  return `<div class="bars${buckets.length > 7 ? ' many' : ''}${income ? ' income' : ''}" data-key="bar" role="group" aria-label="${income ? '収入' : '支出'}の棒グラフ">${buckets.map((b, i) => {
     const h = b.total ? Math.max(0.035, b.total / max) : 0.012;
     const on = view.bucket === i;
     return `<button class="bar${on ? ' on' : ''}" data-bucket="${i}" aria-pressed="${on}" aria-label="${esc(b.label)} ${hidden ? '' : esc(C.yen(b.total))}">
@@ -162,11 +163,12 @@ export function mount(root, ctx) {
   pieShown.clear(); // 画面に入るたびに、円はぐるっと描き直す
   const go = changes => { Object.assign(view, { dir: 0 }, changes); ctx.rerender(); };
   page.addEventListener('click', e => {
-    const el = e.target.closest('[data-unit], [data-chart], [data-step], [data-bucket], [data-group], [data-cat], [data-act="clear"], [data-tx]');
+    const el = e.target.closest('[data-unit], [data-chart], [data-flow], [data-step], [data-bucket], [data-group], [data-cat], [data-act="clear"], [data-tx]');
     if (!el) return;
     const d = el.dataset;
     if (d.unit) { if (d.unit !== view.unit) go({ unit: d.unit, offset: 0, bucket: null }); }
     else if (d.chart) { if (d.chart !== view.chart) go({ chart: d.chart, bucket: null, group: null, cat: null }); }
+    else if (d.flow) { if (d.flow !== view.flow) go({ flow: d.flow, bucket: null }); }
     else if (d.step) step(+d.step);
     else if (d.bucket !== undefined) go({ bucket: view.bucket === +d.bucket ? null : +d.bucket });
     else if (d.group) go({ group: view.group === d.group ? null : d.group, cat: null });
