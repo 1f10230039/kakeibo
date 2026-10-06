@@ -255,6 +255,17 @@ test('deleteManual：手入力だけ「取消」にできる（行は消さな�
   assert.strictEqual(call({ key: KEY, action: 'deleteManual', params: { id: 'm_K1_1' } }).ok, false);
 });
 
+test('deleteManual：積立の設定から入れた月は消せる。メールで確かめた積立は消せない', () => {
+  const t = baseTables();
+  const nisa = (id, status) => ({ 'id': id, '種類': '支出', '利用日': '2026-05-01', '利用先': 'FUND', '金額': 10000, '支払月': '', '状態': status, 'カテゴリ': '', 'カテゴリの決め方': '未分類', '出どころ': '楽天証券', '対応する速報': '' });
+  t['取引'].push(nisa('s_SET_202605', '設定から'), nisa('m_N1_1', '確定'));
+  const { call, store } = setup(memoryStore(t));
+  assert.strictEqual(call({ key: KEY, action: 'deleteManual', params: { id: 's_SET_202605' } }).ok, true);
+  assert.strictEqual(store.tables['取引'].find(r => r['id'] === 's_SET_202605')['状態'], '取消');
+  assert.strictEqual(call({ key: KEY, action: 'deleteManual', params: { id: 'm_N1_1' } }).ok, false);
+  assert.strictEqual(store.tables['取引'].find(r => r['id'] === 'm_N1_1')['状態'], '確定');
+});
+
 // ---- 速報の始末 ----
 test('resolveSokuho：取消にする／確定の行と結びつける', () => {
   let { call, store } = setup();

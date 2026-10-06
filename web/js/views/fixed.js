@@ -97,7 +97,7 @@ function monthSection(txs, f, month, isCurrent, hidden, names, today) {
       const t = e.t, change = changeOf.get(C.fixedKey(t));
       return `<button class="row" data-key="t:${esc(t.id)}" data-tx="${esc(t.id)}">
         ${iconMark(t.category, C.FIXED_GROUP)}
-        <span class="t"><b><span class="cat-name">${esc(C.fixedName(t, names))}</span></b><small>${m}/${e.day}</small></span>
+        <span class="t"><b><span class="cat-name">${esc(C.fixedName(t, names))}</span></b><small>${m}/${e.day}${t.status === '設定から' ? '<span class="badge">設定から</span>' : ''}</small></span>
         <span class="a">${money(t.amount, hidden)}${change && !hidden ? `<small class="chg ${change > 0 ? 'up' : 'down'}">${change > 0 ? '+' : '−'}${esc(C.yen(Math.abs(change)))}</small>` : ''}</span>
       </button>`;
     }

@@ -265,10 +265,12 @@ const ACTIONS = {
   /**
    * 手入力を消す。行そのものは消さずに状態を「取消」にする。
    * 行を消すと下の行の番号がずれて、同じ時間に動いている取り込み側が別の行に書いてしまうため。
+   * 積立の設定から埋めた月（出どころ＝楽天証券・状態＝設定から）も消せる（10/7：メールで確かめていない、たぶん払った記録なので）。
    */
   deleteManual({ id }, { store }) {
     const row = findTx(store, id);
-    if (row['出どころ'] !== '手入力') throw new UserError('消せるのは手入力だけです');
+    const fromSetting = row['出どころ'] === '楽天証券' && row['状態'] === '設定から';
+    if (row['出どころ'] !== '手入力' && !fromSetting) throw new UserError('消せるのは、手入力と、積立の設定から入れた記録だけです');
     row['状態'] = '取消';
     store.update(SHEET.TX, row);
     return { id };

@@ -4,11 +4,14 @@
  *
  * - setup()  ：最初に1回だけ手で実行する。データ用のスプレッドシートを作り、1時間おきのトリガーを入れる
  * - ingest() ：メールを読んで取引のシートに足す。トリガーから1時間おきに動く。手で実行してもよい
+ * - addNisaHistory()：積立NISA の前の月を入れる。手で1回だけ実行する（10/7。何回動かしても増えない）
  */
 
 const SENDER = 'info@mail.rakuten-card.co.jp';
 // ゴミ箱のメールも読む（本人が届いてすぐ消しても取り込めるように・10/6 本人）。迷惑メールは読まない（楽天カードを名乗る偽のメールを入れないため）
 const MAIL_QUERY = `from:${SENDER} カード利用のお知らせ newer_than:60d -in:spam`;
+// 楽天証券の積立の約定（10/7）。読み方は 楽天証券.gs
+const NISA_QUERY = `from:${SEC_SENDER} subject:積立購入が完了しました newer_than:60d -in:spam`;
 const MAX_FAILS = 3; // これだけ続けて読めなかったメールは、あきらめて「やること」に出す
 const PROP = { SHEET_ID: 'SHEET_ID', FAILS: 'FAILS', IGNORED: 'IGNORED' };
 
@@ -90,30 +93,31 @@ function ingest() {
     const ignored = JSON.parse(props.getProperty(PROP.IGNORED) || '{}');
     const known = knownMessageIds(rows);
 
-    const entries = [];
-    for (const id of listMessageIds(MAIL_QUERY)) {
+    const entries = [], nisa = [];
+    for (const id of [...new Set([...listMessageIds(MAIL_QUERY), ...listMessageIds(NISA_QUERY)])]) {
       // もう取り込んだもの・対象外とわかっているもの・あきらめたものは、本文を取りにいかない
       if (known.has(id) || ignored[id] || (fails[id] || 0) >= MAX_FAILS) continue;
       const msg = fetchMessage(id);
       log.read++;
 
-      const kind = msg.from.includes(SENDER) ? classifySubject(msg.subject) : null;
+      const kind = classifyMail(msg);
       if (!kind) { ignored[id] = msg.time; continue; }
 
-      const es = toEntries(kind, id, msg.body);
+      const es = kind === 'nisa' ? toNisaEntries(id, msgLines(msg)) : toEntries(kind, id, msg.body);
       if (!es) {
         fails[id] = (fails[id] || 0) + 1;
         log.failed++;
         continue;
       }
       delete fails[id];
-      es.forEach(e => { e.time = msg.time; entries.push(e); });
+      es.forEach(e => { e.time = msg.time; (kind === 'nisa' ? nisa : entries).push(e); });
     }
 
     entries.sort((a, b) => a.time - b.time); // 速報 → 確定 の順に当てはめるため
     const st = mergeEntries(rows, entries, ruleMap, nowString());
+    const sn = nisa.length ? mergeNisaWithSetup(ss, rows, nisa, ruleMap) : { added: 0, replaced: 0 };
     saveRows(txSheet, rows);
-    Object.assign(log, { added: st.added, replaced: st.replaced, linked: st.linked });
+    Object.assign(log, { added: st.added + sn.added, replaced: st.replaced + sn.replaced, linked: st.linked });
 
     const givenUp = Object.keys(fails).filter(id => fails[id] >= MAX_FAILS);
     putSetting(ss, '読めなかったメール', givenUp.join(','));
@@ -131,6 +135,74 @@ function ingest() {
         '速報と結びつけた': log.linked, '読めなかった': log.failed, 'メモ': log.memo,
       }]);
     }
+    lock.releaseLock();
+  }
+}
+
+/** メールの種類：カード（'sokuho'／'kakutei'）、楽天証券の積立（'nisa'）、対象外（null）。送り主で分けてから件名を見る。 */
+function classifyMail(msg) {
+  if (msg.from.includes(SENDER)) return classifySubject(msg.subject);
+  if (msg.from.includes(SEC_SENDER)) return classifySecSubject(msg.subject);
+  return null;
+}
+
+/** 本文を1行ずつに（楽天証券のメールは HTML だけなので、HTML から文字を取り出す）。 */
+function msgLines(msg) {
+  return msg.body ? toLines(msg.body) : htmlToLines(msg.html);
+}
+
+/**
+ * 積立の行を足す前に、カテゴリ「積立・投資」と、ファンドの対応表（表示名「積立NISA」）がなければ足す。そのあと突き合わせる。
+ * 対応表・カテゴリのシートはここで書く（取引のシートは呼んだ側が saveRows で書く）。
+ */
+function mergeNisaWithSetup(ss, rows, entries, ruleMap, settings) {
+  const catSheet = ss.getSheetByName(SHEET.CATEGORIES);
+  const cat = nisaCategoryRow(readTable(catSheet));
+  if (cat) appendRows(catSheet, [cat]);
+  const today = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+  const funds = [...entries, ...(settings || [])].map(e => ({ fund: e.fund, account: e.account }));
+  const ruleRows = nisaRuleRows(ruleMap, funds, today);
+  if (ruleRows.length) appendRows(ss.getSheetByName(SHEET.RULES), ruleRows);
+  const st = mergeNisa(rows, entries, ruleMap, nowString());
+  if (settings) st.added += fillNisaFromSettings(rows, settings, new Date(), ruleMap, nowString());
+  return st;
+}
+
+/**
+ * 積立NISA の前の月を入れる（10/7 本人）。Apps Script の画面で、この関数を選んで1回だけ実行する。
+ * 1. 残っている約定のメールを、日付に関係なく全部読む（ふだんの ingest は 60日より前を読まない）
+ * 2. 積立設定のメールから、メールのない月（初回購入日の月〜先月）を「設定から」の状態で埋める
+ * もうある行は足さないので、何回動かしてもよい。結果は「記録」のシートとログに出る。
+ */
+function addNisaHistory() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30 * 1000)) throw new Error('取り込みが動いています。少し待ってから、もう一度実行してください');
+  const ss = getSpreadsheet();
+  try {
+    const txSheet = ss.getSheetByName(SHEET.TX);
+    const rows = readTable(txSheet);
+    const ruleMap = buildRuleMap(readTable(ss.getSheetByName(SHEET.RULES)));
+    const entries = [], settings = [];
+    let failed = 0;
+    for (const id of listMessageIds(`from:${SEC_SENDER} subject:積立購入が完了しました -in:spam`)) {
+      const msg = fetchMessage(id);
+      const es = classifyMail(msg) === 'nisa' ? toNisaEntries(id, msgLines(msg)) : null;
+      if (es) entries.push(...es); else failed++;
+    }
+    for (const id of listMessageIds(`from:${SEC_SENDER} subject:積立設定が完了しました -in:spam`)) {
+      const msg = fetchMessage(id);
+      const ss2 = msg.from.includes(SEC_SENDER) ? parseNisaSetting(msgLines(msg)) : null;
+      if (ss2) ss2.forEach(s => settings.push(Object.assign({ messageId: id }, s))); else failed++;
+    }
+    const st = mergeNisaWithSetup(ss, rows, entries, ruleMap, settings);
+    saveRows(txSheet, rows);
+    const memo = `積立NISA の前の月：約定のメール ${entries.length}件・設定 ${settings.length}件から`;
+    appendRows(ss.getSheetByName(SHEET.LOG), [{
+      '日時': nowString(), '読んだメール': entries.length + settings.length + failed, '足した': st.added, '置き換えた': st.replaced,
+      '速報と結びつけた': 0, '読めなかった': failed, 'メモ': memo,
+    }]);
+    console.log(`${memo}。足した ${st.added}件・置き換えた ${st.replaced}件・読めなかった ${failed}通`);
+  } finally {
     lock.releaseLock();
   }
 }
@@ -171,7 +243,18 @@ function fetchMessage(id) {
     from: header('from'),
     time: Number(m.internalDate),
     body: findPlainText(m.payload),
+    html: findPart(m.payload, 'text/html'), // text/plain がないメール（楽天証券）のため
   };
+}
+
+/** メールの部品をたどって、その種類（text/html など）の本文を探す。 */
+function findPart(part, mimeType) {
+  if (part.mimeType === mimeType && part.body && part.body.data) return decodeBody(part);
+  for (const p of part.parts || []) {
+    const text = findPart(p, mimeType);
+    if (text) return text;
+  }
+  return '';
 }
 
 /** メールの部品をたどって、text/plain の本文を探す。 */

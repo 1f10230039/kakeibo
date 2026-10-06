@@ -107,7 +107,7 @@ export function row(t, group, hidden, sub = '', title = t.category || '未分類
   const d = C.parseYmd(t.date);
   return `<button class="row" data-key="${esc(t.id)}" data-tx="${esc(t.id)}">
     ${iconMark(t.category, group)}
-    <span class="t"><b><span class="cat-name">${esc(title)}</span>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</b><small>${d.getMonth() + 1}/${d.getDate()}${t.status === '速報' ? '<span class="badge">速報</span>' : ''}${t.source === '手入力' ? '<span class="badge">手入力</span>' : ''}</small></span>
+    <span class="t"><b><span class="cat-name">${esc(title)}</span>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</b><small>${d.getMonth() + 1}/${d.getDate()}${t.status === '速報' ? '<span class="badge">速報</span>' : ''}${t.source === '手入力' ? '<span class="badge">手入力</span>' : ''}${t.status === '設定から' ? '<span class="badge">設定から</span>' : ''}</small></span>
     <span class="a">${money(t.amount, hidden)}</span>
   </button>`;
 }

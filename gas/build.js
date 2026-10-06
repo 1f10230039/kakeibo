@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PROJECTS = {
-  '取り込み': { files: ['共通.gs', '取り込み/取り込み.gs', '取り込み/実行.gs'], manifest: '取り込み/appsscript.json' },
+  '取り込み': { files: ['共通.gs', '取り込み/取り込み.gs', '取り込み/楽天証券.gs', '取り込み/実行.gs'], manifest: '取り込み/appsscript.json' },
   'API': { files: ['共通.gs', 'api/API.gs'], manifest: 'api/appsscript.json' },
 };
 

@@ -34,6 +34,9 @@ const fixedRows = () => [
   ...[0, 1, 2, 3, 4].map(b => [monthly(b, 11), 'VIDEO SERVICE', b === 0 ? 1590 : 1490, 'サブスク']), // 今月から値上げ
   ...[2, 3, 4, 5].map(b => [monthly(b, 3), 'MUSIC APP', 980, 'サブスク']), // 2か月前で解約
 ].filter(([o]) => o !== null).map(([o, m, a, c]) => tx(o, m, a, c));
+// 積立NISA の見本（楽天証券のメール・積立の設定から。カードではないので支払月なし）
+const nisaRows = () => [0, 1, 2, 3, 4, 5].map(b => [monthly(b, 1), b]).filter(([o]) => o !== null)
+  .map(([o, b]) => tx(o, 'SAMPLE FUND', 10000, '積立・投資', { source: '楽天証券', payMonth: '', status: b >= 4 ? '設定から' : '確定' }));
 
 let seq = 0;
 function tx(offset, merchant, amount, category, extra = {}) {
@@ -68,19 +71,21 @@ const DB = {
     tx(-60, 'SAMPLE MART', 2600, '食費'),
     tx(-90, 'SAMPLE MART', 2900, '食費'),
     ...fixedRows(),
+    ...nisaRows(),
     { id: 'h_mock1', type: '支出', date: d(-2), merchant: '', amount: 300, payMonth: '', status: '手入力', category: '食費', categoryBy: '個別', source: '手入力', memo: 'コンビニ' },
     ...[[-3, 5000, 'お小遣い'], [-11, 52000, 'バイト代'], [-41, 48000, 'バイト代']].map(([o, amount, memo], i) => (
       { id: `h_inc${i}`, type: '収入', date: d(o), merchant: '', amount, payMonth: '', status: '手入力', category: '', categoryBy: '', source: '手入力', memo })),
   ],
   categories: [
     ['食費', '暮らし'], ['日用品', '暮らし'], ['交通費', '暮らし'], ['健康・医療', '暮らし'],
-    ['サブスク', '固定費'], ['通信費', '固定費'],
+    ['サブスク', '固定費'], ['通信費', '固定費'], ['積立・投資', '固定費'],
     ['趣味・娯楽', 'たのしみ'], ['衣服', 'たのしみ'], ['美容', 'たのしみ'], ['交際費', 'たのしみ'],
     ['その他', 'その他'],
   ].map(([name, group], i) => ({ name, group, order: i + 1 })),
   rules: [
     { merchant: 'SAMPLE MART', category: '食費', displayName: '' }, { merchant: 'JR EAST', category: '交通費', displayName: '' },
     { merchant: 'APPLE COM BILL', category: 'サブスク', displayName: 'Apple One' }, { merchant: 'VIDEO SERVICE', category: 'サブスク', displayName: '動画サービス' },
+    { merchant: 'SAMPLE FUND', category: '積立・投資', displayName: '積立NISA' },
   ],
   budgets: [{ month: '', target: '全体', amount: 50000 }],
   assets: [...assetRows(3, 182000, 61200, 60000), ...assetRows(2, 176500, 70300, 70000), ...assetRows(1, 190300, 81900, 80000)],

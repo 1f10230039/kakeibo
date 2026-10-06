@@ -59,6 +59,7 @@ export function openDetail(ctx, id) {
       <div><dt>利用日</dt><dd>${esc(C.mdw(d))}</dd></div>
       <div><dt>状態</dt><dd>${esc(t.status)}</dd></div>
       ${t.payMonth ? `<div><dt>支払月</dt><dd>${esc(t.payMonth.replace('-', '年'))}月${t.status === '速報' ? '（仮）' : ''}</dd></div>` : ''}
+      ${t.source === '楽天証券' ? `<div><dt>出どころ</dt><dd>楽天証券${info(t.status === '設定から' ? 'メールが残っていなかった月を、積立の設定（毎月の日・金額）から入れた記録です。この月に積立をしていなければ、下のボタンで消してください。' : '楽天証券の「積立購入が完了しました（約定）」のメールから入れた記録です。利用日は注文日です。カードではないので、引き落としには入りません。')}</dd></div>` : ''}
     </dl>
     ${canRule ? `<label class="switch-row"><span>この店はいつもこの内容${info(`オンにすると、カテゴリと名前を対応表に入れて、「${t.merchant}」のほかの利用にもまとめて付けます。\nオフなら、この1件だけ変えます。`)}</span>
       <input type="checkbox" id="always" ${alwaysOn ? 'checked' : ''}><span class="switch" aria-hidden="true"></span></label>` : ''}
@@ -68,7 +69,7 @@ export function openDetail(ctx, id) {
     <div class="name-row"><input id="name" data-clear maxlength="100" autocomplete="off" enterkeyhint="done" placeholder="例：YouTube Premium" value="${esc(t.memo || ruleName)}"></div>
     <button class="btn primary wide" data-act="save">保存</button>
     <div class="sheet-actions">
-      ${t.source === '手入力' ? '<button class="btn danger" data-act="delete">この記録を消す</button>' : ''}
+      ${t.source === '手入力' || t.status === '設定から' ? '<button class="btn danger" data-act="delete">この記録を消す</button>' : ''}
       ${stale ? '<button class="btn danger" data-act="cancel">キャンセルだったので取り消す</button>' : ''}
     </div>
   `, (sheet, close) => {
@@ -95,7 +96,7 @@ export function openDetail(ctx, id) {
     nameEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) sheet.querySelector('[data-act="save"]').click(); });
 
     sheet.querySelector('[data-act="delete"]')?.addEventListener('click', async e => {
-      if (!confirm('この手入力の記録を消しますか？')) return;
+      if (!confirm(t.status === '設定から' ? '積立の設定から入れた記録です。この月に積立をしていなければ、消してください。消しますか？' : 'この手入力の記録を消しますか？')) return;
       const restore = busy(e.currentTarget, '消しています…');
       if (await ctx.write(api.deleteManual(t.id), '消しました')) close(); else restore();
     });

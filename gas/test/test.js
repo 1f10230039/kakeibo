@@ -14,7 +14,7 @@ const Utilities = {
   newBlob: bytes => ({ getDataAsString: cs => new TextDecoder(cs).decode(Buffer.from(bytes)) }),
 };
 const ctx = vm.createContext({ console, Utilities, Buffer });
-for (const f of ['共通.gs', '取り込み/取り込み.gs', '取り込み/実行.gs']) {
+for (const f of ['共通.gs', '取り込み/取り込み.gs', '取り込み/楽天証券.gs', '取り込み/実行.gs']) {
   vm.runInContext(fs.readFileSync(path.join(gasDir, f), 'utf8'), ctx, { filename: f });
 }
 const g = name => vm.runInContext(name, ctx);
@@ -189,10 +189,118 @@ test('12月の速報の仮の支払月は翌年1月', () => {
   assert.strictEqual(g('nextMonth')('2026-12-15'), '2027-01');
 });
 
-let failed = 0;
-for (const [name, fn] of tests) {
-  try { fn(); console.log('  ok  ' + name); }
-  catch (e) { failed++; console.log('  NG  ' + name + '\n      ' + e.message.split('\n').join('\n      ')); }
-}
-console.log(`\n${tests.length - failed} / ${tests.length} 通過`);
-process.exit(failed ? 1 : 0);
+// ---- 楽天証券の積立（積立NISA。10/7） ----
+
+const NISA_FUND = 'サンプル 全世界株式ファンド(ダミー)'; // 全角のかっこは半角にそろう
+const nisaRuleMap = () => ({ [g('normalizeMerchant')(NISA_FUND)]: '積立・投資' });
+
+test('楽天証券：送り主と件名で見分ける（楽天証券を名乗るほかの送り主は読まない）', () => {
+  const c = g('classifyMail');
+  assert.strictEqual(c({ from: '楽天証券 <service@rakuten-sec.co.jp>', subject: '【投資信託】積立購入が完了しました（約定）' }), 'nisa');
+  assert.strictEqual(c({ from: 'service@rakuten-sec.co.jp', subject: '【投資信託】次回積立予定をお知らせします' }), null);
+  assert.strictEqual(c({ from: 'mktg_nws@rakuten-sec.co.jp', subject: '【投資信託】積立購入が完了しました（約定）' }), null);
+  assert.strictEqual(c({ from: 'info@mail.rakuten-card.co.jp', subject: 'カード利用のお知らせ(本人ご利用分)' }), 'kakutei');
+});
+
+test('楽天証券：HTML だけの約定のメールを分解する（注文日・ファンド・金額・口座区分）', () => {
+  const lines = g('htmlToLines')(fixture('nisa_order.html'));
+  assert.ok(!lines.some(l => /<|>|th,td|mso/.test(l)), 'タグ・CSS・Outlook 用の書き込み・コメント（中に > があっても）は残らない');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(g('parseNisaOrders')(lines))),
+    [{ date: '2026-05-01', fund: NISA_FUND, amount: 12345, account: 'NISAつみたて投資枠' }]);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(g('toNisaEntries')('X1', lines))).map(e => [e.kind, e.id]), [['nisa', 'm_X1_1']]);
+});
+
+test('楽天証券：1通に2つのファンド・表が「見出し | 値」の1行でも読める。1つでも欠けたら丸ごと null', () => {
+  const html = fixture('nisa_order.html');
+  const block = html.slice(html.indexOf('<tr>\n<td style="font-weight:bold; background'), html.indexOf('<!--その他件数-->'));
+  const two = html.replace('<!--その他件数-->', block.replace('サンプル 全世界株式ファンド（ダミー）', 'もう一つのファンド').replace('12,345円', '3,000円') + '<!--その他件数-->');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(g('parseNisaOrders')(g('htmlToLines')(two)))).map(i => [i.fund, i.amount]), [[NISA_FUND, 12345], ['もう一つのファンド', 3000]]);
+  const md = '| 5月7日に完了（約定）した注文 |\n| |\n| サンプル 全世界株式ファンド（ダミー） |\n| 口座区分 | NISAつみたて投資枠 |\n|---|---|\n| 購入金額 | 12,345円 |\n| 注文日 | 2026年5月1日 |';
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(g('parseNisaOrders')(g('toLines')(md)))), [{ date: '2026-05-01', fund: NISA_FUND, amount: 12345, account: 'NISAつみたて投資枠' }]);
+  assert.strictEqual(g('parseNisaOrders')(g('htmlToLines')(html.replace('2026年5月1日', ''))), null);
+  assert.strictEqual(g('parseNisaOrders')(g('htmlToLines')(html.replace('12,345円', '未定'))), null);
+  assert.strictEqual(g('parseNisaOrders')(g('htmlToLines')(html.replace('5月7日に完了（約定）した注文', 'お知らせ'))), null);
+});
+
+test('楽天証券：積立設定のメールを分解する。毎月でない積立は null', () => {
+  const lines = g('htmlToLines')(fixture('nisa_setting.html'));
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(g('parseNisaSetting')(lines))),
+    [{ fund: NISA_FUND, day: 1, amount: 12345, account: 'NISAつみたて投資枠', first: '2026-03-02' }]);
+  assert.strictEqual(g('parseNisaSetting')(g('htmlToLines')(fixture('nisa_setting.html').replace('毎月1日', '毎日'))), null);
+  assert.strictEqual(g('parseNisaSetting')(g('htmlToLines')(fixture('nisa_setting.html').replace('毎月1日', '毎月1日・15日'))), null); // 形の分からない積立は推測しない
+});
+
+test('楽天証券：指定日が休みなら次の営業日（土日・祝日・年末年始。月末にそろえる）', () => {
+  const b = g('secBusinessDay');
+  assert.deepStrictEqual(['2026-03', '2026-05', '2026-08', '2027-01', '2026-02', '2026-04'].map((m, i) => b(m, [1, 1, 1, 1, 31, 29][i])),
+    ['2026-03-02', '2026-05-01', '2026-08-03', '2027-01-04', '2026-03-02', '2026-04-30']); // 2/31 → 2/28（土）→ 3/2、4/29 は昭和の日
+});
+
+test('楽天証券：約定のメールの行（出どころ＝楽天証券・支払月なし・対応表のカテゴリ）。同じメールは二重にしない', () => {
+  const rows = [];
+  const e = { kind: 'nisa', id: 'm_X1_1', date: '2026-05-01', fund: NISA_FUND, amount: 12345, account: 'NISAつみたて投資枠' };
+  const st = g('mergeNisa')(rows, [e, { ...e }], nisaRuleMap(), '2026-10-07 10:00');
+  assert.deepStrictEqual([st.added, st.skipped], [1, 1]);
+  const r = rows[0];
+  assert.deepStrictEqual([r['種類'], r['利用日'], r['利用先'], r['金額'], r['支払月'], r['状態'], r['出どころ'], r['カテゴリ'], r['カテゴリの決め方']],
+    ['支出', '2026-05-01', NISA_FUND, 12345, '', '確定', '楽天証券', '積立・投資', '対応表']);
+  assert.ok(g('knownMessageIds')(rows).has('X1'), '次からはメールを読みにいかない');
+});
+
+test('楽天証券：設定から、メールのない月（初回の月〜先月）を埋める。何回動かしても増えない。あとからメールが来たら置き換える', () => {
+  const ruleMap = nisaRuleMap();
+  const rows = [];
+  g('mergeNisa')(rows, [{ kind: 'nisa', id: 'm_APR_1', date: '2026-04-01', fund: NISA_FUND, amount: 12345, account: 'NISAつみたて投資枠' }], ruleMap, 'now');
+  const settings = [{ messageId: 'SET', fund: NISA_FUND, day: 1, amount: 12345, account: 'NISAつみたて投資枠', first: '2026-03-10' }];
+  const today = new Date(2026, 9, 7);
+  assert.strictEqual(g('fillNisaFromSettings')(rows, settings, today, ruleMap, 'now'), 6); // 3・5・6・7・8・9月（4月はメールの行、10月はメールを待つ）
+  // 初回の月は初回購入日（月の途中に設定したとき）、そのあとは指定日（休みなら次の営業日）
+  assert.deepStrictEqual(rows.filter(r => r['状態'] === '設定から').map(r => r['利用日']), ['2026-03-10', '2026-05-01', '2026-06-01', '2026-07-01', '2026-08-03', '2026-09-01']);
+  assert.ok(rows.every(r => r['カテゴリ'] === '積立・投資' && r['出どころ'] === '楽天証券' && r['支払月'] === ''));
+  assert.strictEqual(g('fillNisaFromSettings')(rows, settings, today, ruleMap, 'now'), 0);
+  // 8月のメールがあとから見つかった：設定から の行を、メールの行（確定・メールの注文日）に置き換える
+  const st = g('mergeNisa')(rows, [{ kind: 'nisa', id: 'm_AUG_1', date: '2026-08-03', fund: NISA_FUND, amount: 12345, account: 'NISAつみたて投資枠' }], ruleMap, 'now');
+  assert.deepStrictEqual([st.added, st.replaced, rows.length], [0, 1, 7]);
+  assert.deepStrictEqual([rows.find(r => r['id'] === 'm_AUG_1')['状態'], rows.filter(r => r['状態'] === '設定から').length], ['確定', 5]);
+  // 取消にした月は、設定から埋め直す（取消は「その月はなかった」ではなく、本人が消した行）→ 埋めない
+  rows.find(r => r['利用日'] === '2026-06-01')['状態'] = '取消';
+  assert.strictEqual(g('fillNisaFromSettings')(rows, settings, today, ruleMap, 'now'), 0);
+});
+
+test('楽天証券：カードの速報・確定は、同じ日・同じ金額の積立の行に結びつけない', () => {
+  const rows = [];
+  g('mergeNisa')(rows, [{ kind: 'nisa', id: 'm_X1_1', date: '2026-05-01', fund: NISA_FUND, amount: 12345, account: 'NISAつみたて投資枠' }], nisaRuleMap(), 'now');
+  const st = g('mergeEntries')(rows, [{ kind: 'sokuho', id: 'm_C1_1', date: '2026-05-01', amount: 12345 }, { kind: 'kakutei', id: 'm_C2_1', date: '2026-05-01', merchant: 'SHOP', amount: 12345, payMonth: '2026-06' }], {}, 'now');
+  assert.deepStrictEqual([st.added, st.replaced, st.linked, rows.length], [1, 1, 0, 2]);
+  assert.strictEqual(rows[0]['id'], 'm_X1_1');
+});
+
+test('楽天証券：対応表とカテゴリがなければ足す行を返す（本人が変えた対応表はそのまま）', () => {
+  const ruleMap = {};
+  const add = g('nisaRuleRows')(ruleMap, [{ fund: NISA_FUND, account: 'NISAつみたて投資枠' }, { fund: NISA_FUND, account: 'NISAつみたて投資枠' }], '2026-10-07');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(add)), [{ '利用先': NISA_FUND, 'カテゴリ': '積立・投資', '決めた日': '2026-10-07', '表示名': '積立NISA' }]);
+  assert.strictEqual(ruleMap[g('normalizeMerchant')(NISA_FUND)], '積立・投資');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(g('nisaRuleRows')({ [g('normalizeMerchant')(NISA_FUND)]: 'その他' }, [{ fund: NISA_FUND, account: '' }], 'x'))), []);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(g('nisaCategoryRow')([{ 'カテゴリ': '食費', '並び順': 1 }, { 'カテゴリ': '通信費', '並び順': 6 }]))), { 'カテゴリ': '積立・投資', 'グループ': '固定費', '並び順': 7 });
+  assert.strictEqual(g('nisaCategoryRow')([{ 'カテゴリ': '積立・投資', '並び順': 7 }]), null);
+});
+
+(async () => {
+  // 営業日の決まりが、PWA の calc.js（内閣府の祝日の一覧と照らし合わせ済み・10/6）と全部の日で同じか
+  const calc = await import(require('url').pathToFileURL(path.join(__dirname, '..', '..', 'web', 'js', 'calc.js')).href);
+  test('楽天証券：休みの日の決まりが、PWA の calc.js と 2020〜2035年の全部の日で同じ', () => {
+    const diff = [];
+    for (let d = new Date(2020, 0, 1); d.getFullYear() <= 2035; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+      if (g('isMarketHoliday')(d) !== calc.isBankHoliday(d)) diff.push(calc.ymd(d));
+    }
+    assert.deepStrictEqual(diff, []);
+  });
+
+  let failed = 0;
+  for (const [name, fn] of tests) {
+    try { fn(); console.log('  ok  ' + name); }
+    catch (e) { failed++; console.log('  NG  ' + name + '\n      ' + e.message.split('\n').join('\n      ')); }
+  }
+  console.log(`\n${tests.length - failed} / ${tests.length} 通過`);
+  process.exit(failed ? 1 : 0);
+})();
