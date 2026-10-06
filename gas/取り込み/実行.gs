@@ -7,7 +7,8 @@
  */
 
 const SENDER = 'info@mail.rakuten-card.co.jp';
-const MAIL_QUERY = `from:${SENDER} カード利用のお知らせ newer_than:60d`;
+// ゴミ箱のメールも読む（本人が届いてすぐ消しても取り込めるように・10/6 本人）。迷惑メールは読まない（楽天カードを名乗る偽のメールを入れないため）
+const MAIL_QUERY = `from:${SENDER} カード利用のお知らせ newer_than:60d -in:spam`;
 const MAX_FAILS = 3; // これだけ続けて読めなかったメールは、あきらめて「やること」に出す
 const PROP = { SHEET_ID: 'SHEET_ID', FAILS: 'FAILS', IGNORED: 'IGNORED' };
 
@@ -155,7 +156,7 @@ function listMessageIds(q) {
   const ids = [];
   let pageToken;
   do {
-    const res = Gmail.Users.Messages.list('me', { q, maxResults: 100, pageToken });
+    const res = Gmail.Users.Messages.list('me', { q, maxResults: 100, pageToken, includeSpamTrash: true }); // 迷惑メールは q の -in:spam で外す
     (res.messages || []).forEach(m => ids.push(m.id));
     pageToken = res.nextPageToken;
   } while (pageToken);

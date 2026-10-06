@@ -4,6 +4,8 @@
 import assert from 'node:assert';
 import * as C from '../js/calc.js';
 import * as T from '../js/theme.js';
+import * as V from '../js/csv.js';
+import fs from 'node:fs';
 
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
@@ -187,6 +189,56 @@ test('収入：今月の入金（1日〜今日、取消は入れない）。支�
   assert.deepStrictEqual(C.categoryTotals(txs).map(c => c.total), [300]);
   assert.deepStrictEqual(C.incomeNames(txs), ['お小遣い', 'バイト代']);
   assert.deepStrictEqual(C.incomeNames([inc('2026-10-01', 1, { memo: '仕送り' })]), ['仕送り', 'バイト代', 'お小遣い']);
+});
+
+// ---- e-NAVI の CSV（fixtures/enavi_dummy.csv は本物と同じ形のダミー） ----
+const enavi = fs.readFileSync(new URL('./fixtures/enavi_dummy.csv', import.meta.url), 'utf8');
+
+test('CSV：その月の支払い分・「以降」の分・外す行（返金・家族）に分け、店名をメールの形にそろえる', () => {
+  const p = V.parseEnaviCsv(enavi);
+  assert.strictEqual(p.statementMonth, '2026-10');
+  assert.deepStrictEqual(p.rows.map(r => [r.date, r.merchant, r.amount, r.payMonth]), [
+    ['2026-09-28', 'SAMPLE MART', 1100, '2026-10'], ['2026-09-28', 'SAMPLE MART', 1100, '2026-10'],
+    ['2026-09-20', 'EXAMPLE* CLOUD SVC', 3604, '2026-10'], ['2026-09-18', 'EXAMPLE.COM', 1590, '2026-10'],
+    ['2026-09-10', 'サンプルホンテン', 341, '2026-10'],
+  ]);
+  assert.deepStrictEqual([p.later.length, p.skipped.map(s => s.amount)], [1, [-500, 800]]);
+});
+
+test('CSV：12月の利用 → 翌年1月払い。形の違うファイルは断る', () => {
+  const jan = enavi.replace('10月支払金額', '1月支払金額').replace(/"10月"/g, '"1月"').replace(/2026\/09/g, '2026/12');
+  assert.strictEqual(V.parseEnaviCsv(jan).statementMonth, '2027-01');
+  assert.throws(() => V.parseEnaviCsv('"日付","店"\n"2026/09/01","x"'), V.CsvError);
+  assert.throws(() => V.parseEnaviCsv(enavi.replace(/"10月"/g, '"9月"')), V.CsvError);
+});
+
+test('CSV：欄の中のカンマ・"" ・改行も読める', () => {
+  assert.deepStrictEqual(V.parseCsvText('"a,b","c""d"\r\n"e\nf",g\n'), [['a,b', 'c"d'], ['e\nf', 'g']]);
+});
+
+test('照合：利用日と金額で当てる（同じものが2つなら2つ目は足す候補）。手入力・収入・取消には当てない', () => {
+  const t = (id, date, amount, extra = {}) => ({ id, type: '支出', date, amount, status: '確定', source: 'メール', payMonth: '2026-10', merchant: '', category: '', ...extra });
+  const txs = [
+    t('m_1', '2026-09-28', 1100, { merchant: 'SAMPLE MART' }),
+    t('m_s', '2026-09-20', 3604, { status: '速報', payMonth: '2026-11' }), // 速報の仮の支払月がずれていても当たる
+    t('c_1', '2026-09-18', 1590, { source: 'CSV', merchant: 'EXAMPLE.COM' }), // 前に CSV から足した行
+    t('h_1', '2026-09-10', 341, { source: '手入力', status: '手入力' }),
+    t('i_1', '2026-09-10', 341, { type: '収入', source: '手入力', status: '手入力' }),
+    t('x_1', '2026-09-10', 341, { status: '取消' }),
+    t('m_9', '2026-09-15', 999, { merchant: 'GONE SHOP' }), // CSV に出てこない → キャンセルかも
+    t('m_n', '2026-10-02', 500, { payMonth: '2026-11' }), // 来月払いの分は、この CSV では見ない
+  ];
+  const r = V.reconcile(txs, V.parseEnaviCsv(enavi));
+  assert.deepStrictEqual(r.matched.map(([, x]) => x.id), ['m_1', 'm_s', 'c_1']);
+  assert.deepStrictEqual(r.csvOnly.map(c => [c.date, c.amount]), [['2026-09-28', 1100], ['2026-09-10', 341]]);
+  assert.deepStrictEqual(r.mailOnly.map(x => x.id), ['m_9']);
+});
+
+test('照合：同じ日・同じ金額の候補が複数なら、店名が同じほうに当てる', () => {
+  const t = (id, merchant) => ({ id, type: '支出', date: '2026-09-28', amount: 1100, status: '確定', source: 'メール', payMonth: '2026-10', merchant });
+  const one = { statementMonth: '2026-10', rows: [{ date: '2026-09-28', merchant: 'SAMPLE MART', amount: 1100, payMonth: '2026-10' }] };
+  const r = V.reconcile([t('m_a', 'OTHER SHOP'), t('m_b', 'sample　ｍａｒｔ')], one);
+  assert.deepStrictEqual([r.matched[0][1].id, r.mailOnly.map(x => x.id)], ['m_b', ['m_a']]);
 });
 
 test('金額の書き方', () => {

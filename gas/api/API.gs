@@ -260,6 +260,44 @@ const ACTIONS = {
   },
 
   /**
+   * e-NAVI の CSV との照合の結果を反映する（F-08, F-09・S-09）。照らし合わせは PWA の中で行い、本人がチェックしたものだけが届く。
+   * add：CSV にだけあった利用（確定分）。出どころ＝CSV・状態＝確定で足し、対応表があればカテゴリを付ける
+   * cancel：メールにだけあった利用（キャンセルかもしれない）の id。状態を「取消」にする（行は消さない）
+   * 先にぜんぶ確かめてから書く（1件でも形が違えば、何も書かない）。
+   */
+  importCsv({ add, cancel }, { store, now, newId }) {
+    if (!Array.isArray(add) || !Array.isArray(cancel)) throw new UserError('add と cancel は配列にしてください');
+    if (add.length > 500 || cancel.length > 200) throw new UserError('一度に送れるのは、足す500件・取り消す200件までです');
+    add.forEach((a, i) => {
+      if (!a || typeof a !== 'object') throw new UserError(`add[${i}] の形が違います`);
+      checkDate(a.date);
+      checkText(a.merchant, `add[${i}].merchant`, 100, false);
+      if (!Number.isInteger(a.amount) || a.amount < 1 || a.amount > 10000000) throw new UserError(`add[${i}].amount は 1〜10,000,000 の整数にしてください`);
+      checkMonth(a.payMonth, `add[${i}].payMonth`);
+    });
+    const targets = cancel.map(id => {
+      const row = findTx(store, id);
+      if (row['種類'] !== '支出' || !['メール', 'CSV'].includes(row['出どころ']) || !['確定', '速報'].includes(row['状態'])) {
+        throw new UserError('取り消せるのは、メールか CSV から入った支出だけです');
+      }
+      return row;
+    });
+
+    const ruleMap = buildRuleMap(store.rows(SHEET.RULES));
+    const batch = newId().replace(/^h_/, '');
+    store.append(SHEET.TX, add.map((a, i) => {
+      const category = ruleMap[normalizeMerchant(a.merchant)] || '';
+      return {
+        'id': `c_${batch}_${i + 1}`, '種類': '支出', '利用日': a.date, '利用先': a.merchant.trim(), '金額': a.amount, '支払月': a.payMonth,
+        '状態': '確定', 'カテゴリ': category, 'カテゴリの決め方': category ? '対応表' : '未分類',
+        '出どころ': 'CSV', '対応する速報': '', 'メモ': '', '取り込み日時': now(),
+      };
+    }));
+    targets.forEach(row => { row['状態'] = '取消'; store.update(SHEET.TX, row); });
+    return { added: add.length, cancelled: targets.length };
+  },
+
+  /**
    * 予算（F-21）。いまは全体の予算だけ（U-02 → 10/6 本人「全体だけ」）。
    * month：'' なら毎月の予算、'YYYY-MM' ならその月だけの予算（毎月の予算より優先）。
    * amount：1〜10,000,000 の整数。null なら、その予算をやめる（行は消さずに金額を空にする。行の番号をずらさないため）。

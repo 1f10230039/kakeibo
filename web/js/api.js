@@ -96,6 +96,8 @@ export const addIncome = (entry) => call('addIncome', entry);
 export const deleteManual = (id) => call('deleteManual', { id });
 export const resolveSokuho = (id) => call('resolveSokuho', { id });
 export const setSetting = (key, value) => call('setSetting', { key, value });
+/** CSV の照合の結果を反映する（S-09）。add：[{ date, merchant, amount, payMonth }]、cancel：[id] */
+export const importCsv = (add, cancel) => call('importCsv', { add, cancel });
 /** 予算。month：'' なら毎月、'YYYY-MM' ならその月だけ。amount：null ならやめる。 */
 export const setBudget = (month, amount) => call('setBudget', { month, amount });
 /** 資産の記録。金額は整数か null（その項目は記録しない／やめる）。3つとも null ならその日の記録をやめる。 */

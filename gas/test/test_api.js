@@ -239,6 +239,38 @@ test('setBudget：月・金額の形が違えば断る', () => {
   assert.strictEqual(store.tables['予算'].length, 0);
 });
 
+// ---- CSV の照合（S-09） ----
+test('importCsv：CSV にだけあった利用を確定で足し（対応表のカテゴリつき）、選んだものを取り消す', () => {
+  const { call, store } = setup();
+  call({ key: KEY, action: 'setRule', params: { merchant: 'NETFLIX.COM', category: 'サブスク' } });
+  const r = call({ key: KEY, action: 'importCsv', params: {
+    add: [{ date: '2026-09-18', merchant: 'NETFLIX.COM', amount: 1590, payMonth: '2026-10' }, { date: '2026-09-11', merchant: '楽天モバイル通信料', amount: 14, payMonth: '2026-10' }],
+    cancel: ['m_K1_1'],
+  } });
+  assert.deepStrictEqual(r, { ok: true, data: { added: 2, cancelled: 1 } });
+  const added = store.tables['取引'].filter(x => x['出どころ'] === 'CSV');
+  assert.deepStrictEqual(added.map(x => [x.id, x['状態'], x['カテゴリ'], x['カテゴリの決め方'], x['支払月']]),
+    [['c_new_1', '確定', 'サブスク', '対応表', '2026-10'], ['c_new_2', '確定', '', '未分類', '2026-10']]);
+  assert.strictEqual(store.tables['取引'].find(x => x.id === 'm_K1_1')['状態'], '取消');
+});
+test('importCsv：1件でも形が違えば何も書かない。取り消せるのはメール／CSV の支出だけ', () => {
+  const { call, store } = setup();
+  const before = JSON.stringify(store.tables['取引']);
+  const good = { date: '2026-09-18', merchant: 'NETFLIX.COM', amount: 1590, payMonth: '2026-10' };
+  for (const params of [
+    { add: [good, { ...good, amount: 0 }], cancel: [] }, { add: [good, { ...good, merchant: '=HYPERLINK("x")' }], cancel: [] },
+    { add: [{ ...good, date: '2026-02-30' }], cancel: [] }, { add: [{ ...good, payMonth: '2026/10' }], cancel: [] },
+    { add: [good], cancel: ['h_old'] }, { add: [good], cancel: ['nope'] }, { add: good, cancel: [] }, { add: [] },
+    { add: Array(501).fill(good), cancel: [] },
+  ]) assert.strictEqual(call({ key: KEY, action: 'importCsv', params }).ok, false, JSON.stringify(params).slice(0, 80));
+  call({ key: KEY, action: 'addManual', params: { date: '2026-10-01', amount: 300 } });
+  assert.strictEqual(call({ key: KEY, action: 'importCsv', params: { add: [], cancel: ['h_new'] } }).ok, false); // 手入力は deleteManual で
+  store.tables['取引'].at(-1)['状態'] = '確定'; // 状態が確定でも、出どころが手入力なら断る
+  assert.strictEqual(call({ key: KEY, action: 'importCsv', params: { add: [], cancel: ['h_new'] } }).ok, false);
+  store.tables['取引'].at(-1)['状態'] = '手入力';
+  assert.strictEqual(JSON.stringify(store.tables['取引'].slice(0, -1)), before);
+});
+
 // ---- 収入 ----
 test('addIncome：種類＝収入・手入力で足す。名前はメモ。getData で type が収入になる', () => {
   const { call, store } = setup();

@@ -1,0 +1,5 @@
+# 改行は LF にそろえる（10/6。Windows の Python で書き直したファイルが CR＋LF になっていたため）
+* text=auto eol=lf
+*.png binary
+*.webp binary
+*.jpg binary

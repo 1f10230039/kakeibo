@@ -100,6 +100,12 @@ export async function mockCall(action, p) {
         category: p.category || '', categoryBy: p.category ? '個別' : '未分類', source: '手入力', memo: p.memo || '' });
       return { id };
     }
+    case 'importCsv': {
+      p.add.forEach((a, i) => DB.transactions.push({ id: `c_mock${Date.now()}_${i}`, type: '支出', date: a.date, merchant: a.merchant, amount: a.amount,
+        payMonth: a.payMonth, status: '確定', category: '', categoryBy: '未分類', source: 'CSV', memo: '' }));
+      p.cancel.forEach(id => { find(id).status = '取消'; });
+      return { added: p.add.length, cancelled: p.cancel.length };
+    }
     case 'addIncome': {
       const id = 'h_inc' + Date.now();
       DB.transactions.push({ id, type: '収入', date: p.date, merchant: '', amount: p.amount, payMonth: '', status: '手入力', category: '', categoryBy: '', source: '手入力', memo: p.memo || '' });

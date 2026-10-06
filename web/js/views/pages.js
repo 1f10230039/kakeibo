@@ -113,7 +113,7 @@ export const menu = {
         <div class="row"><span class="t"><b>週の始まり</b><small>統計の「週」と、ホームの「今週」</small></span>
           ${seg('week', [['月', '月曜'], ['日', '日曜']], s.weekStart, '週の始まり')}</div>
         <a class="row link" href="#/budget"><span class="t"><b>予算</b><small>${budgetLabel(ctx)}</small></span>${icon('chevron')}</a>
-        <div class="row"><span class="t"><b>CSV の取り込みと照合</b><small>e-NAVI の CSV の形がわかってから作ります</small></span></div>
+        <a class="row link" href="#/csv"><span class="t"><b>CSV の取り込みと照合</b><small>e-NAVI の明細の CSV と、メールの記録を照らし合わせる（パソコンで）</small></span>${icon('chevron')}</a>
       </div>
       <div class="menu-group-label">状態</div>
       <div class="list card">

@@ -96,10 +96,14 @@ function mergeEntries(rows, entries, ruleMap, now) {
     seen.add(e.id);
 
     const same = r => r['出どころ'] === 'メール' && r['利用日'] === e.date && Number(r['金額']) === e.amount;
+    // e-NAVI の CSV（S-09）から先に足した行。同じ利用日・同じ金額なら、このメールの分とみなして二重にしない
+    // （ゴミ箱のメールも読むようにしたので、CSV で足したあとに、その分のメールが遅れて入ってくることがある・10/6）
+    const fromCsv = r => r['出どころ'] === 'CSV' && r['状態'] === '確定' && r['利用日'] === e.date && Number(r['金額']) === e.amount;
 
     if (e.kind === 'sokuho') {
-      // 確定版のほうが先に届いていたら、新しい行は作らずに結びつけるだけ
-      const kakutei = rows.find(r => same(r) && r['状態'] === '確定' && !r['対応する速報']);
+      // 確定版（または CSV の行）のほうが先にあれば、新しい行は作らずに結びつけるだけ
+      const kakutei = rows.find(r => same(r) && r['状態'] === '確定' && !r['対応する速報'])
+        || rows.find(r => fromCsv(r) && !r['対応する速報']);
       if (kakutei) {
         kakutei['対応する速報'] = e.id;
         kakutei._dirty = true;
@@ -126,6 +130,18 @@ function mergeEntries(rows, entries, ruleMap, now) {
       sokuho['状態'] = '確定';
       applyRule(sokuho, ruleMap);
       sokuho._dirty = true;
+      stats.replaced++;
+      continue;
+    }
+    // CSV から足した行があれば、その行をこのメールの行にする（id をメールのものにして、次からは読みにいかない）
+    const csv = rows.find(fromCsv);
+    if (csv) {
+      csv['id'] = e.id;
+      csv['利用先'] = e.merchant;
+      csv['支払月'] = e.payMonth;
+      csv['出どころ'] = 'メール';
+      applyRule(csv, ruleMap);
+      csv._dirty = true;
       stats.replaced++;
       continue;
     }

@@ -128,6 +128,34 @@ test('個別に決めたカテゴリは、確定で置き換えても変えな�
   assert.strictEqual(rows[0]['カテゴリ'], '交際費');
 });
 
+const csvRow = (date, amount, extra = {}) => ({
+  'id': 'c_x' + date + amount, '種類': '支出', '利用日': date, '利用先': 'SAMPLE MART', '金額': amount, '支払月': '2026-02',
+  '状態': '確定', 'カテゴリ': '', 'カテゴリの決め方': '未分類', '出どころ': 'CSV', '対応する速報': '', 'メモ': '', '取り込み日時': '', ...extra,
+});
+
+test('CSV から足した行と同じ日・同じ金額の確定版は、新しい行を作らずにメールの行に置き換える', () => {
+  const rows = [csvRow('2026-01-10', 1234, { 'カテゴリ': '交際費', 'カテゴリの決め方': '個別' })];
+  const st = merge(rows, entriesOf('kakutei', 'K1', 'kakutei.txt'));
+  assert.deepStrictEqual({ ...st }, { added: 1, replaced: 1, linked: 0, skipped: 0 }); // 2件目（01-11）は新しく足す
+  assert.strictEqual(rows.length, 2);
+  assert.deepStrictEqual([rows[0]['id'], rows[0]['出どころ'], rows[0]['カテゴリ']], ['m_K1_1', 'メール', '交際費']); // 個別のカテゴリは残す
+  assert.deepStrictEqual([...g('knownMessageIds')(rows)], ['K1']); // 次からはこのメールを読みにいかない
+});
+
+test('CSV から足した行と同じ日・同じ金額の速報は、結びつけるだけ（行を増やさない）', () => {
+  const rows = [csvRow('2026-01-10', 1234)];
+  const st = merge(rows, entriesOf('sokuho', 'S1', 'sokuho.txt'));
+  assert.deepStrictEqual({ ...st }, { added: 0, replaced: 0, linked: 1, skipped: 0 });
+  assert.deepStrictEqual([rows.length, rows[0]['対応する速報'], rows[0]['状態']], [1, 'm_S1_1', '確定']);
+});
+
+test('取消にした CSV の行や、金額の違う CSV の行には当てない', () => {
+  const rows = [csvRow('2026-01-10', 1234, { '状態': '取消' }), csvRow('2026-01-10', 999)];
+  merge(rows, entriesOf('sokuho', 'S1', 'sokuho.txt'));
+  assert.strictEqual(rows.length, 3);
+  assert.strictEqual(rows[2]['状態'], '速報');
+});
+
 test('取引の行から、取り込み済みのメール ID を取り出す', () => {
   const ids = g('knownMessageIds')([
     { 'id': 'm_K1_1', '対応する速報': 'm_S1_1' },

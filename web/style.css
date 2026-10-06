@@ -395,6 +395,17 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 .only-income, .only-spend { animation: fade-in .3s var(--ease) both; }
 .name-chips { margin-top: 12px; }
 
+/* ---- CSV の照合（S-09） ---- */
+.file-btn { cursor: pointer; }
+.file-btn input { display: none; }
+.warn-text { color: var(--warn); }
+.csv-summary { margin: 14px 20px 0; padding: 20px 20px 16px; }
+.csv-counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; text-align: center; }
+.csv-counts b { display: block; font-family: var(--font-num); font-weight: var(--num-weight); font-size: 26px; line-height: 1.2; }
+.csv-counts span { font-size: 10.5px; color: var(--ink2); white-space: nowrap; letter-spacing: -.02em; }
+.check-row { cursor: pointer; }
+.check-row input { width: 20px; height: 20px; accent-color: var(--accent); flex-shrink: 0; margin: 0; }
+
 /* ---- 未分類の振り分け ---- */
 .progress { margin: 4px 24px 10px; font-size: 12px; color: var(--ink2); }
 .sort-card { margin: 0 20px; padding: 26px 22px; text-align: center; }
