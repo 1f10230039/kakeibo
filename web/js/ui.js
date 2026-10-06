@@ -150,6 +150,51 @@ export function toast(text, kind = '') {
   setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2600);
 }
 
+const CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+let statusEl = null, savingCount = 0, savedCount = 0, statusTimer = 0;
+
+/**
+ * 裏で保存しているあいだ、画面の下に「ぐるぐる＋保存しています…」を出す（10/7 本人）。押した直後に出る。
+ * いくつか続けて保存したときは、全部終わるまで出しておき、最後に「✓ 保存しました」（2件からは「✓ 2件 保存しました」）に変えて消す。
+ * 返すもの：{ done(文), fail(文) }。fail は赤いお知らせを出す。
+ */
+export function saving() {
+  savingCount++;
+  clearTimeout(statusTimer);
+  if (!statusEl) {
+    statusEl = document.createElement('div');
+    statusEl.className = 'toast status';
+    statusEl.setAttribute('role', 'status');
+    document.body.appendChild(statusEl);
+    void statusEl.offsetHeight; // 出る前の位置をいったん描いてから、ふわっと出す
+  }
+  statusEl.classList.add('show');
+  statusEl.innerHTML = '<span class="spin" aria-hidden="true"></span>保存しています…';
+  let ended = false;
+  const end = (text, failed) => {
+    if (ended) return;
+    ended = true;
+    savingCount--;
+    if (failed) toast(text, 'warn'); else savedCount++;
+    if (savingCount > 0) return; // まだ保存しているものがある
+    const el = statusEl, n = savedCount; // n：この続けての保存で、うまくいった数（全部失敗なら 0）
+    savedCount = 0;
+    if (n) el.innerHTML = `${CHECK}${esc(n > 1 ? `${n}件 保存しました` : text)}`;
+    statusTimer = setTimeout(() => { el.classList.remove('show'); statusTimer = setTimeout(() => { el.remove(); if (statusEl === el) statusEl = null; }, 300); }, n ? 1600 : 0);
+  };
+  return { done: text => end(text, false), fail: text => end(text, true) };
+}
+
+/** 押したボタンを「ぐるぐる＋文」にして押せなくする（返事を待つ保存・削除のとき）。戻す関数を返す。 */
+export function busy(btn, text = '保存しています…') {
+  if (!btn) return () => {};
+  const html = btn.innerHTML;
+  btn.disabled = true;
+  btn.classList.add('busy');
+  btn.innerHTML = `<span class="spin" aria-hidden="true"></span>${esc(text)}`;
+  return () => { btn.disabled = false; btn.classList.remove('busy'); btn.innerHTML = html; };
+}
+
 /** 横スワイプ（前後の期間へ）。dir：-1＝右へなぞった（前へ）、+1＝左へなぞった（次へ）。 */
 export function onSwipe(el, handler) {
   let x0 = null, y0 = null;

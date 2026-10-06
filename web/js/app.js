@@ -3,7 +3,7 @@
 
 import * as api from './api.js';
 import { lookOf } from './theme.js';
-import { toast, closeSheet, icon, addClearButtons, morph, applyVars, countUp, reduceMotion } from './ui.js';
+import { toast, saving, closeSheet, icon, addClearButtons, morph, applyVars, countUp, reduceMotion } from './ui.js';
 import * as home from './views/home.js';
 import * as stats from './views/stats.js';
 import * as budget from './views/budget.js';
@@ -26,6 +26,11 @@ const DEPTH = { menu: 1, unclassified: 1, stale: 1, income: 1, rules: 2, csv: 2 
 const RISE = '.spend, .income-main, .csv-summary, .budget-main, .budget-empty, .asset-main, .asset-chart, .asset-spend, .asset-empty, .pair, .due, .todo, .home-side > *, .page-head, .controls, .period, .chart, .tx-list > *, .lead, .menu-group-label, .list, .progress, .sort-card, .switch-row, .field, .picker-group, .btn.wide, .note, .credit, .empty';
 
 const state = { data: null, fetchedAt: 0, hidden: readHidden(), loading: false };
+// 画面に出すデータ（state.data）＝ サーバーから最後に取れたデータ（server）＋ まだ返事の来ていない保存（pending）
+let server = null;
+const pending = new Set(); // { apply(data) }：data をその保存のあとの形に書き換える（何度当てても同じになる書き方にする）
+let appliedAt = 0;         // いまの server を取りに行った（送った）時刻。これより前に送った返事では上書きしない
+let freshCount = 0;        // 書き込みの返事で新しいデータを受け取った回数
 const root = document.getElementById('app');
 const nav = document.getElementById('tabbar');
 let shown = null; // いま #app に出している画面（読み込み中は 'loading'）
@@ -46,6 +51,7 @@ function context(entering = false) {
     rerender: render,
     refresh,
     write,
+    saveSoon,
     openDetail: id => openDetail(context(), id),
     openManual: kind => openManual(context(), kind),
     openAsset: date => assets.openAssetSheet(context(), { date }),
@@ -126,15 +132,41 @@ function playEnter(from, to) {
   });
 }
 
+/** 画面に出すデータを作り直す（サーバーのデータに、返事待ちの保存を当てる）。中身が変わったら true。 */
+function rebuild() {
+  if (!server) return false;
+  const data = structuredClone(server);
+  pending.forEach(p => p.apply(data));
+  const changed = !state.data || JSON.stringify(data) !== JSON.stringify(state.data);
+  state.data = data;
+  return changed;
+}
+
+/** サーバーから取れたデータを使う。sentAt より後に送った返事をもう使っていたら、古いので捨てる。 */
+function applyData(wrapped, sentAt) {
+  if (sentAt < appliedAt) return false;
+  appliedAt = sentAt;
+  server = wrapped.data;
+  state.fetchedAt = wrapped.fetchedAt;
+  return rebuild();
+}
+
+// 書き込みの返事に新しいデータが入っていたら、取り直さずにそれを使う（10/7）
+api.onFresh((wrapped, sentAt) => {
+  freshCount++;
+  if (applyData(wrapped, sentAt)) render();
+});
+
+let refreshAgain = false; // 取り直している最中に、もう一度取り直したくなった
+
 /** データを取り直す。失敗しても、前に取れたデータがあればそれで表示を続ける。 */
 async function refresh(announce = false) {
-  if (state.loading) return;
+  if (state.loading) { refreshAgain = true; return; }
   state.loading = true;
   let changed = true;
   try {
-    const { data, fetchedAt } = await api.fetchData();
-    changed = !state.data || JSON.stringify(data) !== JSON.stringify(state.data);
-    Object.assign(state, { data, fetchedAt });
+    const sentAt = Date.now();
+    changed = applyData(await api.fetchData(), sentAt);
     if (announce) toast('取り直しました');
   } catch (e) {
     if (e instanceof api.AuthError) {
@@ -147,20 +179,51 @@ async function refresh(announce = false) {
     state.loading = false;
     // 中身が前と同じなら描き直さない（開いた直後の動きを止めないため）。「取り直す」を押したときは時刻を出し直す
     if (changed || announce) render();
+    if (refreshAgain) { refreshAgain = false; refresh(); }
   }
 }
 
-/** 書き込み（カテゴリの変更・手入力など）をして、終わったら取り直す。うまくいったら true。 */
+const failText = e => (e instanceof api.NetworkError ? '送れませんでした。電波のあるところでもう一度' : e.message);
+
+/**
+ * 書き込み（手入力・予算など）をして、返事を待つ。うまくいったら true。
+ * 返事に新しいデータが入っていればそれを使い、入っていなければ（GAS ② が古い）取り直す。
+ */
 async function write(promise, doneText) {
+  const n = freshCount;
   try {
     await promise;
-    toast(doneText);
   } catch (e) {
-    toast(e instanceof api.NetworkError ? '送れませんでした。電波のあるところでもう一度' : e.message, 'warn');
+    toast(failText(e), 'warn');
     return false;
   }
-  await refresh();
+  if (freshCount === n) await refresh();
+  toast(doneText);
   return true;
+}
+
+/**
+ * 先に画面へ出してから、裏で保存する（10/7 本人：押したらすぐ反映。待っているあいだは「保存しています…」）。
+ * patch(data)：保存したあとの形に data を書き換える関数。run()：保存の通信（Promise を返す）。
+ * 失敗したら、画面を元に戻して知らせる。
+ */
+function saveSoon(patch, run, doneText = '保存しました') {
+  const p = { apply: patch };
+  pending.add(p);
+  rebuild();
+  render();
+  const note = saving();
+  const n = freshCount;
+  run().then(async () => {
+    if (freshCount === n) await refresh(); // 返事に新しいデータがなかった（GAS ② が古い）
+    pending.delete(p);
+    if (rebuild()) render();
+    note.done(doneText);
+  }, e => {
+    pending.delete(p);
+    if (rebuild()) render();
+    note.fail(`${failText(e)}（元に戻しました）`);
+  });
 }
 
 // ---- 起動 ----
@@ -177,7 +240,7 @@ window.addEventListener('hashchange', () => {
 });
 
 const cached = api.cachedData();
-if (cached) Object.assign(state, { data: cached.data, fetchedAt: cached.fetchedAt });
+if (cached) { server = cached.data; Object.assign(state, { data: structuredClone(cached.data), fetchedAt: cached.fetchedAt }); }
 if (route().name === 'stats') stats.enter(route().query);
 render();
 if (api.hasCredentials()) refresh();

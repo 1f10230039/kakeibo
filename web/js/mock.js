@@ -1,5 +1,6 @@
 // 見本のデータ（?mock=1 を付けたときだけ使う）。金額・店名はすべてダミー。
 // 本物の API と同じ形で返し、書き込みはこのページを開いている間だけメモリ上で反映する。
+import { UserError } from './api.js';
 
 const today = new Date();
 const d = (offset) => {
@@ -77,13 +78,40 @@ const DB = {
 };
 
 const norm = s => String(s || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toUpperCase();
-const wait = () => new Promise(r => setTimeout(r, 250)); // 本物っぽく少し待つ
+// 本物っぽく少し待つ。?mock=slow なら本物の GAS くらい（2.5秒）待ち、?mock=fail なら書き込みを失敗させる（保存中の表示・元に戻すの確認用）
+// ?mock=old は、10/7 より前の GAS ②（saveDetail がなく、返事に新しいデータを入れない）のふり
+const MODE = new URLSearchParams(location.search).get('mock');
+const wait = () => new Promise(r => setTimeout(r, MODE === 'slow' || MODE === 'fail' || MODE === 'old' ? 2500 : 250));
+
+/** 書き込みのあとの新しいデータ（本物の API の fresh の代わり）。古い GAS のふりのときは返さない。 */
+export function mockData() {
+  return MODE === 'old' ? null : JSON.parse(JSON.stringify(DB));
+}
 
 export async function mockCall(action, p) {
   await wait();
+  if (MODE === 'fail' && action !== 'getData') throw new Error('mock：わざと失敗させました');
+  if (MODE === 'old' && action === 'saveDetail') throw new UserError('知らない action です');
+  return run(action, p);
+}
+
+function run(action, p) {
   const find = id => DB.transactions.find(t => t.id === id);
   switch (action) {
     case 'getData': return JSON.parse(JSON.stringify(DB));
+    case 'saveDetail': {
+      const t = find(p.id);
+      if (p.always) {
+        const was = { ...t };
+        run('setRule', { merchant: t.merchant, category: p.category, displayName: p.name });
+        if (was.categoryBy === '個別' && was.category !== p.category) Object.assign(t, { category: p.category });
+        t.memo = '';
+      } else {
+        if ((p.category || '') !== (t.category || '')) Object.assign(t, { category: p.category, categoryBy: p.category ? '個別' : '未分類' });
+        t.memo = p.name;
+      }
+      return { id: p.id };
+    }
     case 'setCategory': { const t = find(p.id); t.category = p.category; t.categoryBy = p.category ? '個別' : '未分類'; return { id: p.id }; }
     case 'setRule': {
       const r = DB.rules.find(r => norm(r.merchant) === norm(p.merchant));

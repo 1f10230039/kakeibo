@@ -4,7 +4,7 @@
 
 import * as C from '../calc.js';
 import * as api from '../api.js';
-import { esc, money, openSheet, toast, icon, bindAmountInput, amountOf } from '../ui.js';
+import { esc, money, openSheet, toast, icon, bindAmountInput, amountOf, busy } from '../ui.js';
 
 export const morphable = true;
 
@@ -93,11 +93,9 @@ function openEditor(ctx, month) {
     bindAmountInput(amountEl);
     // 送っている間はボタンを押せなくする。うまくいったら閉じ、失敗したら入れた金額を残したまま押せるように戻す
     const send = async (btn, job, doneText) => {
-      const label = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = '保存しています…';
+      const restore = busy(btn); // 押した直後に、ボタンの中にぐるぐると「保存しています…」
       if (await ctx.write(job, doneText)) close();
-      else { btn.disabled = false; btn.textContent = label; }
+      else restore();
     };
     const saveBtn = sheet.querySelector('[data-act="save"]');
     saveBtn.addEventListener('click', () => {

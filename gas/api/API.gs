@@ -109,7 +109,14 @@ function handleRequest(body, deps) {
   }
   const params = req.params && typeof req.params === 'object' ? req.params : {};
   try {
-    return { ok: true, data: deps.withLock(() => ACTIONS[req.action](params, deps)) };
+    return deps.withLock(() => {
+      const out = { ok: true, data: ACTIONS[req.action](params, deps) };
+      // 書き込みのあとの新しいデータ（10/7）：fresh に getData と同じ期間を送ると、同じ返事に入れて返す。取り直しの通信が1回減る
+      if (req.action !== 'getData' && req.fresh && typeof req.fresh === 'object') {
+        try { out.fresh = ACTIONS.getData(req.fresh, deps); } catch (_) { /* 書き込みはできている。取り直しは PWA が別にする */ }
+      }
+      return out;
+    });
   } catch (err) {
     if (err instanceof UserError) return { ok: false, error: err.message };
     console.error(err);
@@ -193,6 +200,33 @@ const ACTIONS = {
     checkText(memo, 'memo', 100, true);
     row['メモ'] = (memo || '').trim();
     store.update(SHEET.TX, row);
+    return { id };
+  },
+
+  /**
+   * 利用の詳細の「保存」（10/7 本人：カテゴリ・「この店はいつもこの内容」・名前を、保存ボタンでまとめて1回で）。
+   * always：対応表に入れ、同じ店の行にまとめて当てる（setRule）。この行が「個別」なら、この行も変える。
+   *   名前は店の表示名にして、この行だけの名前は消す（消さないと、こちらが優先して出てしまう）。
+   * always でない：この行だけ。カテゴリと名前の、変わったほうだけ書く。
+   * 書く前に全部の形を確かめる（途中まで書いて失敗しないように）。
+   */
+  saveDetail({ id, category, name, always }, deps) {
+    const row = findTx(deps.store, id);
+    if (row['種類'] !== '支出') throw new UserError('カテゴリを付けられるのは支出だけです');
+    checkText(name, 'name', 100, true);
+    const memo = (name || '').trim();
+    if (always) {
+      if (!row['利用先']) throw new UserError('店名のない利用は「いつもこの内容」にできません');
+      if (!category) throw new UserError('先にカテゴリを選んでください');
+      checkCategory(deps.store, category, false);
+      ACTIONS.setRule({ merchant: row['利用先'], category, displayName: memo }, deps);
+      if (row['カテゴリの決め方'] === '個別' && row['カテゴリ'] !== category) ACTIONS.setCategory({ id, category }, deps);
+      if (row['メモ']) ACTIONS.setMemo({ id, memo: '' }, deps);
+    } else {
+      checkCategory(deps.store, category, true);
+      if ((category || '') !== (row['カテゴリ'] || '')) ACTIONS.setCategory({ id, category: category || '' }, deps);
+      if (memo !== String(row['メモ'] || '')) ACTIONS.setMemo({ id, memo }, deps);
+    }
     return { id };
   },
 

@@ -478,6 +478,12 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
   background: var(--ink); color: var(--bg); padding: 11px 18px; border-radius: 14px; font-size: 13px; transition: opacity .3s, transform .5s var(--spring); max-width: calc(100% - 40px); }
 .toast.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
 .toast.warn { background: var(--warn); color: #fff; }
+/* 裏で保存しているあいだのお知らせ（ui.js の saving）：ぐるぐる＋文、終わったら ✓ */
+.toast.status { display: flex; align-items: center; gap: 9px; white-space: nowrap; }
+.toast.status svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; animation: pop-in .35s var(--spring) both; }
+/* 小さなぐるぐる（お知らせとボタンの中）。色は文字の色に合わせる */
+.spin { width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; opacity: .85; animation: spin .8s linear infinite; }
+.btn.busy, .btn.busy:disabled { gap: 8px; opacity: .85; cursor: progress; }
 .loading { display: grid; place-items: center; gap: 14px; padding-top: 40vh; color: var(--ink2); font-size: 13px; }
 .spinner { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin 1s linear infinite; }
 .loading { animation: fade-in .4s .2s both; }
@@ -505,7 +511,8 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 @keyframes card-next { from { opacity: 0; transform: translateX(40px) rotate(1.5deg); } }
 
 /* iPhone の「視差効果を減らす」がオンのときは動かさない */
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; }
+  .spin, .spinner { animation: spin 1.6s linear infinite !important; } /* 待っていることが分かるように、ぐるぐるだけはゆっくり回す */ }
 
 /* ---- PC（幅 900px 以上）：タブバー → 左の縦メニュー、ホームと統計は2列 ---- */
 @media (min-width: 900px) {

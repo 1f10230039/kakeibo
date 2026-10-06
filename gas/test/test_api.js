@@ -162,6 +162,74 @@ test('setMemo：1件だけの名前を付ける・消す。式の書き出しは
   assert.strictEqual(call({ key: KEY, action: 'setMemo', params: { id: 'h_old', memo: 'x' } }).ok, false); // 取消の行は対象外
 });
 
+test('saveDetail：いつもこの内容でない → この行だけ、カテゴリと名前を1回で（変わったほうだけ）', () => {
+  const { call, store } = setup();
+  assert.deepStrictEqual(call({ key: KEY, action: 'saveDetail', params: { id: 'm_K1_1', category: '食費', name: ' おやつ ', always: false } }), { ok: true, data: { id: 'm_K1_1' } });
+  const r = store.tables['取引'][0];
+  assert.deepStrictEqual([r['カテゴリ'], r['カテゴリの決め方'], r['メモ']], ['食費', '個別', 'おやつ']);
+  assert.strictEqual(store.tables['対応表'].length, 0); // 対応表には入れない
+  // 名前だけ変える：カテゴリは書き直さない
+  store.tables['取引'][1]['メモ'] = '前の名前';
+  call({ key: KEY, action: 'saveDetail', params: { id: 'm_K1_2', category: '趣味・娯楽', name: '', always: false } });
+  assert.deepStrictEqual([store.tables['取引'][1]['カテゴリ'], store.tables['取引'][1]['メモ']], ['趣味・娯楽', '']);
+});
+
+test('saveDetail：変わっていないほうは書かない（シートへの書き込みの回数＝速さ）', () => {
+  const store = memoryStore(baseTables());
+  let writes = 0;
+  const update = store.update;
+  store.update = (name, row) => { writes++; update(name, row); };
+  const { call } = setup(store);
+  call({ key: KEY, action: 'saveDetail', params: { id: 'm_K1_1', category: '食費', name: '', always: false } }); // カテゴリだけ
+  assert.strictEqual(writes, 1);
+  writes = 0;
+  call({ key: KEY, action: 'saveDetail', params: { id: 'm_K1_1', category: '食費', name: 'おやつ', always: false } }); // 名前だけ
+  assert.strictEqual(writes, 1);
+  writes = 0;
+  call({ key: KEY, action: 'saveDetail', params: { id: 'm_K1_1', category: '食費', name: 'おやつ', always: false } }); // 何も変わらない
+  assert.strictEqual(writes, 0);
+});
+
+test('saveDetail：いつもこの内容 → 対応表（表示名つき）に入れて同じ店へ。個別の行は、開いた行だけ変える。この行だけの名前は消す', () => {
+  const { call, store } = setup();
+  store.tables['取引'][1]['メモ'] = 'この行だけの名前';
+  assert.strictEqual(call({ key: KEY, action: 'saveDetail', params: { id: 'm_K1_2', category: 'サブスク', name: 'iCloud', always: true } }).ok, true);
+  assert.deepStrictEqual(plain(store.tables['対応表']).map(r => [r['利用先'], r['カテゴリ'], r['表示名']]), [['apple com bill', 'サブスク', 'iCloud']]);
+  assert.deepStrictEqual(store.tables['取引'].slice(0, 2).map(r => [r['カテゴリ'], r['カテゴリの決め方'], r['メモ'] || '']),
+    [['サブスク', '対応表', ''], ['サブスク', '個別', '']]);
+});
+
+test('saveDetail：形が違えば何も書かない（カテゴリなし・店名なし・式の書き出し・知らないカテゴリ・収入・取消）', () => {
+  const { call, store } = setup();
+  call({ key: KEY, action: 'addIncome', params: { date: '2026-10-05', amount: 5000, memo: 'お小遣い' } });
+  const before = JSON.stringify(store.tables);
+  for (const params of [
+    { id: 'm_K1_1', category: '', name: 'x', always: true },
+    { id: 'm_S1_1', category: '食費', name: '', always: true },
+    { id: 'm_K1_1', category: 'サブスク', name: '=CMD()', always: true },
+    { id: 'm_K1_1', category: 'サブスク', name: '@x', always: false },
+    { id: 'm_K1_1', category: 'ない', name: '', always: true },
+    { id: 'm_K1_1', category: 'ない', name: 'x', always: false },
+    { id: 'h_new', category: '食費', name: '', always: false },
+    { id: 'h_old', category: '食費', name: '', always: false },
+  ]) assert.strictEqual(call({ key: KEY, action: 'saveDetail', params }).ok, false, JSON.stringify(params));
+  assert.strictEqual(JSON.stringify(store.tables), before);
+});
+
+test('fresh：書き込みの返事に、書いたあとの getData を入れる。getData には付けない。期間が違っても書き込みは成功', () => {
+  const { call } = setup();
+  const fresh = { from: '2026-01', to: '2026-12' };
+  const res = call({ key: KEY, action: 'setMemo', params: { id: 'm_K1_1', memo: 'あたらしい' }, fresh });
+  assert.deepStrictEqual(res.data, { id: 'm_K1_1' });
+  assert.strictEqual(res.fresh.transactions.find(t => t.id === 'm_K1_1').memo, 'あたらしい');
+  assert.deepStrictEqual(Object.keys(res.fresh).sort(), ['assets', 'budgets', 'categories', 'rules', 'settings', 'transactions']);
+  assert.strictEqual('fresh' in call({ key: KEY, action: 'getData', params: fresh, fresh }), false);
+  const bad = call({ key: KEY, action: 'setMemo', params: { id: 'm_K1_1', memo: 'つぎ' }, fresh: { from: 'x', to: 'y' } });
+  assert.deepStrictEqual([bad.ok, 'fresh' in bad], [true, false]);
+  assert.strictEqual('fresh' in call({ key: KEY, action: 'setMemo', params: { id: 'm_K1_1', memo: 'x' } }), false); // 送らなければ今までどおり
+  assert.strictEqual(call({ key: KEY, action: 'setMemo', params: { id: 'ない', memo: 'x' }, fresh }).ok, false); // 失敗したときは付けない
+});
+
 // ---- 手入力 ----
 test('addManual：足す。金額・日付・メモの形が違えば断る', () => {
   const { call, store } = setup();

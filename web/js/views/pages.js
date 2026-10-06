@@ -2,8 +2,8 @@
 
 import * as C from '../calc.js';
 import * as api from '../api.js';
-import { esc, money, icon, toast, seg, selectSeg } from '../ui.js';
-import { categoryPicker, openDetail } from './sheets.js';
+import { esc, money, icon, toast, seg, selectSeg, busy } from '../ui.js';
+import { categoryPicker, openDetail, saveTx } from './sheets.js';
 import { row } from './home.js';
 
 const backBar = (title, href = '#/home') => `<header class="page-head with-back"><a class="back" href="${href}" aria-label="戻る">${icon('back')}</a><h1>${esc(title)}</h1></header>`;
@@ -71,15 +71,12 @@ export const unclassified = {
     const items = C.newestFirst(C.unclassified(ctx.data.transactions)).filter(t => !skipped.has(t.id));
     const t = items[0];
     if (!t) return;
-    root.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', async () => {
-      const always = root.querySelector('#always')?.checked;
-      const cat = b.dataset.pick;
+    // カテゴリを押したら、返事を待たずに次の利用へ進む（裏で保存。10/7）
+    root.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => {
+      const always = !!root.querySelector('#always')?.checked;
       const name = root.querySelector('#name').value.trim();
       if (/^[=+\-@]/.test(name)) { toast('名前を = + - @ で始めることはできません', 'warn'); return; }
-      const job = always
-        ? api.setRule(t.merchant, cat, name)
-        : api.setCategory(t.id, cat).then(() => (name !== (t.memo || '') ? api.setMemo(t.id, name) : null));
-      await ctx.write(job, always ? `「${t.merchant}」をいつも${cat}にしました` : `${cat}にしました`);
+      saveTx(ctx, t, { category: b.dataset.pick, name, always });
     }));
     root.querySelector('[data-act="skip"]').addEventListener('click', () => { skipped.add(t.id); ctx.rerender(); });
   },
@@ -177,11 +174,12 @@ export const rules = {
       category = b.dataset.pick;
       edit.querySelectorAll('[data-pick]').forEach(x => x.classList.toggle('on', x.dataset.pick === category));
     }));
-    edit.querySelector('[data-act="save-rule"]').addEventListener('click', async () => {
+    edit.querySelector('[data-act="save-rule"]').addEventListener('click', async e => {
       const name = edit.querySelector('#rule-name').value.trim();
       if (/^[=+\-@]/.test(name)) { toast('名前を = + - @ で始めることはできません', 'warn'); return; }
-      const m = editing; editing = null;
-      await ctx.write(api.setRule(m, category, name), `「${m}」を保存しました`);
+      const m = editing;
+      const restore = busy(e.currentTarget);
+      if (await ctx.write(api.setRule(m, category, name), `「${m}」を保存しました`)) { editing = null; ctx.rerender(); } else restore();
     });
   },
 };

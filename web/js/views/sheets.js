@@ -2,7 +2,7 @@
 
 import * as C from '../calc.js';
 import * as api from '../api.js';
-import { esc, money, iconMark, incomeMark, openSheet, toast, icon, seg, selectSeg, bindAmountInput, amountOf } from '../ui.js';
+import { esc, money, iconMark, incomeMark, openSheet, toast, icon, seg, selectSeg, bindAmountInput, amountOf, busy } from '../ui.js';
 
 /** カテゴリをグループごとに並べたボタン。 */
 export function categoryPicker(categories, selected) {
@@ -13,6 +13,32 @@ export function categoryPicker(categories, selected) {
 }
 
 // ---- S-05 利用の詳細 ----
+
+/**
+ * 利用のカテゴリ・名前・「この店はいつもこの内容」を保存する（S-05 と S-06 の振り分け）。
+ * 返事を待たずに先に画面へ出し、裏で1回の通信で保存する（10/7 本人）。画面の変え方は GAS ② の saveDetail と同じ。
+ * choice：{ category, name, always }
+ */
+export function saveTx(ctx, t, { category, name, always }) {
+  const key = C.normalizeMerchant(t.merchant);
+  const patch = data => {
+    const me = data.transactions.find(x => x.id === t.id);
+    if (always) {
+      const rule = data.rules.find(r => C.normalizeMerchant(r.merchant) === key);
+      if (rule) Object.assign(rule, { category, displayName: name });
+      else data.rules.push({ merchant: t.merchant, category, displayName: name });
+      data.transactions.forEach(x => {
+        if (x.type === '支出' && x.status !== '取消' && x.categoryBy !== '個別' && C.normalizeMerchant(x.merchant) === key) Object.assign(x, { category, categoryBy: '対応表' });
+      });
+      if (me) { if (me.categoryBy === '個別') me.category = category; me.memo = ''; }
+    } else if (me) {
+      if (category !== (me.category || '')) Object.assign(me, { category, categoryBy: category ? '個別' : '未分類' });
+      me.memo = name;
+    }
+  };
+  ctx.saveSoon(patch, () => api.saveDetail({ id: t.id, category, name, always }, t),
+    always ? `「${t.merchant}」をいつも${category}にしました` : '保存しました');
+}
 
 export function openDetail(ctx, id) {
   const t = ctx.data.transactions.find(x => x.id === id);
@@ -39,52 +65,44 @@ export function openDetail(ctx, id) {
     <div class="sheet-label">カテゴリ</div>
     ${categoryPicker(ctx.data.categories, t.category)}
     <div class="sheet-label">名前（一覧で用途の横に出ます。なくてもよい）</div>
-    <div class="name-row"><input id="name" data-clear maxlength="100" autocomplete="off" placeholder="例：YouTube Premium" value="${esc(t.memo || ruleName)}">
-      <button class="btn small" data-act="name">保存</button></div>
+    <div class="name-row"><input id="name" data-clear maxlength="100" autocomplete="off" enterkeyhint="done" placeholder="例：YouTube Premium" value="${esc(t.memo || ruleName)}"></div>
+    <button class="btn primary wide" data-act="save">保存</button>
     <div class="sheet-actions">
       ${t.source === '手入力' ? '<button class="btn danger" data-act="delete">この記録を消す</button>' : ''}
       ${stale ? '<button class="btn danger" data-act="cancel">キャンセルだったので取り消す</button>' : ''}
     </div>
   `, (sheet, close) => {
-    const always = () => !!sheet.querySelector('#always')?.checked;
+    // カテゴリのボタンと「いつもこの内容」のスイッチは、選ぶだけ（10/7 本人）。保存ボタンで、名前とまとめて保存する
+    let cat = t.category || '';
     const nameEl = sheet.querySelector('#name');
-    const name = () => nameEl.value.trim();
-    const badName = () => { if (/^[=+\-@]/.test(name())) { toast('名前を = + - @ で始めることはできません', 'warn'); return true; } return false; };
-
-    sheet.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', async () => {
-      if (badName()) return;
-      const cat = b.dataset.pick;
-      // 対応表は「個別」に決めた行を変えないので、この行が個別なら、この行だけは別に変える
-      const job = always()
-        ? api.setRule(t.merchant, cat, name()).then(() => (t.categoryBy === '個別' ? api.setCategory(t.id, cat) : null))
-        : api.setCategory(t.id, cat);
-      await ctx.write(job, always() ? `「${t.merchant}」をいつも${cat}にしました` : `${cat}にしました`);
-      close();
+    const firstName = nameEl.value.trim();
+    sheet.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => {
+      cat = b.dataset.pick;
+      sheet.querySelectorAll('[data-pick]').forEach(x => x.classList.toggle('on', x === b));
     }));
 
-    sheet.querySelector('[data-act="name"]').addEventListener('click', async () => {
-      if (badName()) return;
-      if (always()) {
-        if (!t.category) { toast('先にカテゴリを選んでください', 'warn'); return; }
-        // 店の名前にするので、この利用だけの名前があれば消す（消さないと、こちらが優先して出てしまう）
-        const job = api.setRule(t.merchant, t.category, name()).then(() => (t.memo ? api.setMemo(t.id, '') : null));
-        await ctx.write(job, name() ? `「${t.merchant}」の名前を「${name()}」にしました` : '名前を消しました');
-      } else {
-        await ctx.write(api.setMemo(t.id, name()), name() ? `名前を「${name()}」にしました` : '名前を消しました');
-      }
+    sheet.querySelector('[data-act="save"]').addEventListener('click', () => {
+      const always = !!sheet.querySelector('#always')?.checked;
+      const name = nameEl.value.trim();
+      if (/^[=+\-@]/.test(name)) { toast('名前を = + - @ で始めることはできません', 'warn'); return; }
+      if (always && !cat) { toast('先にカテゴリを選んでください', 'warn'); return; }
+      const changed = cat !== (t.category || '') || name !== firstName || always !== alwaysOn;
       close();
+      if (!changed) return; // 何も変えていなければ、閉じるだけ
+      // 名前を変えていなければ、この行の名前はそのまま（欄に出ていた店の表示名を、この行の名前に写さない）
+      saveTx(ctx, t, { category: cat, name: always || name !== firstName ? name : t.memo || '', always });
     });
-    nameEl.addEventListener('keydown', e => { if (e.key === 'Enter') sheet.querySelector('[data-act="name"]').click(); });
+    nameEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) sheet.querySelector('[data-act="save"]').click(); });
 
-    sheet.querySelector('[data-act="delete"]')?.addEventListener('click', async () => {
+    sheet.querySelector('[data-act="delete"]')?.addEventListener('click', async e => {
       if (!confirm('この手入力の記録を消しますか？')) return;
-      await ctx.write(api.deleteManual(t.id), '消しました');
-      close();
+      const restore = busy(e.currentTarget, '消しています…');
+      if (await ctx.write(api.deleteManual(t.id), '消しました')) close(); else restore();
     });
-    sheet.querySelector('[data-act="cancel"]')?.addEventListener('click', async () => {
+    sheet.querySelector('[data-act="cancel"]')?.addEventListener('click', async e => {
       if (!confirm('この速報を取り消しますか？（キャンセルになった利用のとき）')) return;
-      await ctx.write(api.resolveSokuho(t.id), '取り消しました');
-      close();
+      const restore = busy(e.currentTarget, '取り消しています…');
+      if (await ctx.write(api.resolveSokuho(t.id), '取り消しました')) close(); else restore();
     });
   });
 }
@@ -109,17 +127,18 @@ function openIncomeDetail(ctx, t) {
   `, (sheet, close) => {
     const nameEl = sheet.querySelector('#name');
     bindNameChips(sheet, nameEl);
-    sheet.querySelector('[data-act="name"]').addEventListener('click', async () => {
+    sheet.querySelector('[data-act="name"]').addEventListener('click', async e => {
       const name = nameEl.value.trim();
       if (/^[=+\-@]/.test(name)) { toast('名前を = + - @ で始めることはできません', 'warn'); return; }
-      await ctx.write(api.setMemo(t.id, name), name ? `名前を「${name}」にしました` : '名前を消しました');
-      close();
+      if (name === (t.memo || '')) { close(); return; }
+      const restore = busy(e.currentTarget, '保存中');
+      if (await ctx.write(api.setMemo(t.id, name), name ? `名前を「${name}」にしました` : '名前を消しました')) close(); else restore();
     });
-    nameEl.addEventListener('keydown', e => { if (e.key === 'Enter') sheet.querySelector('[data-act="name"]').click(); });
-    sheet.querySelector('[data-act="delete"]')?.addEventListener('click', async () => {
+    nameEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) sheet.querySelector('[data-act="name"]').click(); });
+    sheet.querySelector('[data-act="delete"]')?.addEventListener('click', async e => {
       if (!confirm('この収入の記録を消しますか？')) return;
-      await ctx.write(api.deleteManual(t.id), '消しました');
-      close();
+      const restore = busy(e.currentTarget, '消しています…');
+      if (await ctx.write(api.deleteManual(t.id), '消しました')) close(); else restore();
     });
   });
 }
@@ -179,15 +198,16 @@ export function openManual(ctx, kind = '支出') {
       category = category === b.dataset.pick ? '' : b.dataset.pick;
       sheet.querySelectorAll('[data-pick]').forEach(x => x.classList.toggle('on', x.dataset.pick === category));
     }));
-    sheet.querySelector('[data-act="save"]').addEventListener('click', async () => {
+    sheet.querySelector('[data-act="save"]').addEventListener('click', async e => {
       const amount = amountOf(amountEl);
       const date = sheet.querySelector('#date').value;
       const memo = memoEl.value.trim();
       if (!Number.isInteger(amount) || amount < 1) { toast('金額を入れてください', 'warn'); amountEl.focus(); return; }
       if (/^[=+\-@]/.test(memo)) { toast('名前を = + - @ で始めることはできません', 'warn'); return; }
+      const restore = busy(e.currentTarget, '記録しています…');
       const job = kind === '収入' ? api.addIncome({ date, amount, memo }) : api.addManual({ date, amount, category, memo });
-      await ctx.write(job, `${C.yen(amount)}${TEXT[kind].done}`);
-      close();
+      // 失敗したら、入れた金額などを残したまま、もう一度押せるように戻す
+      if (await ctx.write(job, `${C.yen(amount)}${TEXT[kind].done}`)) close(); else restore();
     });
     setTimeout(() => amountEl.focus(), 250);
   });

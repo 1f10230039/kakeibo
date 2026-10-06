@@ -6,7 +6,7 @@
 import * as C from '../calc.js';
 import * as api from '../api.js';
 import * as V from '../csv.js';
-import { esc, money, icon, toast } from '../ui.js';
+import { esc, money, icon, toast, busy } from '../ui.js';
 
 const state = { parsed: null, error: '', picks: new Map() }; // picks：'a:何行目' / 'c:id' → チェックしたか（決めていなければ初めの値）
 
@@ -111,9 +111,8 @@ export function mount(root, ctx) {
   btn?.addEventListener('click', async () => {
     const { add, cancel } = chosen();
     if (!confirm(`足す ${add.length}件・取り消す ${cancel.length}件を反映しますか？`)) return;
-    btn.disabled = true;
-    btn.textContent = '反映しています…';
+    const restore = busy(btn, '反映しています…');
     // チェックの覚えは残す（反映した行は「一致」に入る。外したままの行は、外したまま出す）。失敗したら、選んだまま押せるように戻す
-    if (!(await ctx.write(api.importCsv(add, cancel), `${add.length}件足して、${cancel.length}件取り消しました`))) label();
+    if (!(await ctx.write(api.importCsv(add, cancel), `${add.length}件足して、${cancel.length}件取り消しました`))) { restore(); label(); }
   });
 }
