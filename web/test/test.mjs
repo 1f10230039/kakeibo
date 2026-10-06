@@ -36,6 +36,21 @@ test('引き落とし日：27日、土曜なら29日（月）、日曜なら28�
   assert.strictEqual(C.ymd(C.debitDate(2026, 8)), '2026-09-28');   // 9/27 は日曜
 });
 
+test('引き落とし日：27日が土曜で 29日（月）が昭和の日なら 30日（2024年4月。内閣府の一覧で確かめた月）', () => {
+  assert.strictEqual(C.ymd(C.debitDate(2024, 3)), '2024-04-30');
+  assert.strictEqual(C.ymd(C.debitDate(2013, 3)), '2013-04-30');
+  assert.strictEqual(C.ymd(C.debitDate(2025, 3)), '2025-04-28'); // 4/27 は日曜 → 28日（月）
+});
+
+test('祝日：決まった日・第n月曜・春分／秋分・振替休日・国民の休日（内閣府の一覧と同じ日）', () => {
+  const yes = ['2026-01-12', '2026-03-20', '2026-05-06', '2026-09-21', '2026-09-22', '2026-09-23', '2027-03-21', '2027-02-23'];
+  const no = ['2026-04-30', '2026-12-23', '2026-10-27'];
+  yes.forEach(s => assert.strictEqual(C.isHoliday(C.parseYmd(s)), true, s));
+  no.forEach(s => assert.strictEqual(C.isHoliday(C.parseYmd(s)), false, s));
+  assert.strictEqual(C.isBankHoliday(C.parseYmd('2026-12-31')), true);  // 年末年始
+  assert.strictEqual(C.isBankHoliday(C.parseYmd('2027-01-04')), false); // 月曜・仕事始め
+});
+
 test('次の引き落とし：27日までは今月分、過ぎたら来月分。手入力は入れない', () => {
   const txs = [tx('2026-09-10', 3000, { payMonth: '2026-10' }), tx('2026-10-02', 500, { payMonth: '2026-11' }),
     tx('2026-09-12', 300, { payMonth: '', source: '手入力', status: '手入力' })];
