@@ -195,6 +195,31 @@ export function busy(btn, text = '保存しています…') {
   return () => { btn.disabled = false; btn.classList.remove('busy'); btn.innerHTML = html; };
 }
 
+const placed = new WeakSet(); // もう位置を決めた金額の札
+
+/**
+ * 棒グラフ（統計・固定費）で選んだ棒の札：棒より横に広いので、となりの棒のほうが高いと隠れる（10/7 本人）。
+ * 札が横に重なる棒のうち、いちばん高い棒（伸び縮みし終わったときの高さ）より上に出す。初めて出たときは、動かさずにその場所に置く。
+ */
+export function liftValue(root) {
+  const val = root.querySelector('.bar .val');
+  if (!val) return;
+  const cols = [...root.querySelectorAll('.bar .col')];
+  const own = val.parentElement, i = cols.indexOf(own), w = val.offsetWidth, r = own.getBoundingClientRect();
+  const left = i === 0 ? r.left : i === cols.length - 1 ? r.right - w : (r.left + r.right - w) / 2; // CSS と同じ寄せ方（端の棒は内側へ）
+  const heightOf = c => Number(/--h:([\d.]+)/.exec(c.dataset.vars || '')?.[1] || 0);
+  const lift = Math.max(0, ...cols.filter(c => {
+    const b = c.getBoundingClientRect();
+    return b.right > left + 2 && b.left < left + w - 2; // 角の丸みにかするだけなら数えない
+  }).map(heightOf));
+  if (placed.has(val)) { val.style.setProperty('--lift', lift); return; }
+  placed.add(val);
+  val.style.transition = 'none';
+  val.style.setProperty('--lift', lift);
+  void val.offsetWidth; // いまの位置で一度描いてから、動きを戻す
+  val.style.transition = '';
+}
+
 /** 横スワイプ（前後の期間へ）。dir：-1＝右へなぞった（前へ）、+1＝左へなぞった（次へ）。 */
 export function onSwipe(el, handler) {
   let x0 = null, y0 = null;

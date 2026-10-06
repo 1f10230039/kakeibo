@@ -22,6 +22,19 @@ const assetRows = (back, bank, nisa, principal) => [
   { date: monthEnd(back), item: '楽天証券 NISA', amount: nisa, principal },
 ];
 
+// 毎月の固定費の見本（back か月前の day 日。今日より後は入れない）。固定費の画面（S-12）の確認用
+const monthly = (back, day) => {
+  const last = new Date(today.getFullYear(), today.getMonth() - back + 1, 0).getDate();
+  const x = new Date(today.getFullYear(), today.getMonth() - back, Math.min(day, last));
+  return x > today ? null : Math.round((x - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000);
+};
+const fixedRows = () => [
+  ...[0, 1, 2, 3, 4, 5].map(b => [monthly(b, 5), 'APPLE COM BILL', 1200, 'サブスク']),
+  ...[1, 2, 3, 4, 5].map(b => [monthly(b, 26), 'MOBILE CARRIER', b >= 4 ? 3270 : 2970, '通信費']), // 3か月前に安いプランへ
+  ...[0, 1, 2, 3, 4].map(b => [monthly(b, 11), 'VIDEO SERVICE', b === 0 ? 1590 : 1490, 'サブスク']), // 今月から値上げ
+  ...[2, 3, 4, 5].map(b => [monthly(b, 3), 'MUSIC APP', 980, 'サブスク']), // 2か月前で解約
+].filter(([o]) => o !== null).map(([o, m, a, c]) => tx(o, m, a, c));
+
 let seq = 0;
 function tx(offset, merchant, amount, category, extra = {}) {
   const date = d(offset);
@@ -36,14 +49,12 @@ const DB = {
     tx(0, '', 680, '', { status: '速報' }),
     tx(-1, 'SAMPLE MART', 1520, '食費'),
     tx(-1, 'JR EAST', 1240, '交通費'),
-    tx(-2, 'APPLE COM BILL', 1200, 'サブスク'),
     tx(-3, 'RECORD SHOP', 2400, '趣味・娯楽'),
     tx(-4, 'CAFE EXAMPLE', 860, ''),
     tx(-5, 'DRUG STORE', 1980, '日用品'),
     tx(-6, 'SAMPLE MART', 2310, '食費'),
     tx(-8, 'CLOTHING CO', 5900, '衣服'),
     tx(-9, 'IZAKAYA', 4200, '交際費'),
-    tx(-11, 'MOBILE CARRIER', 2970, '通信費'),
     tx(-12, 'SAMPLE MART', 1890, '食費'),
     tx(-15, 'BOOKSTORE', 1650, ''),
     tx(-16, '', 3200, '', { status: '速報' }),
@@ -53,11 +64,10 @@ const DB = {
     tx(-31, 'CLINIC', 1500, '健康・医療'),
     tx(-34, 'SAMPLE MART', 3120, '食費'),
     tx(-38, 'GAME STORE', 6800, '趣味・娯楽'),
-    tx(-45, 'APPLE COM BILL', 1200, 'サブスク'),
     tx(-52, 'IZAKAYA', 3800, '交際費'),
     tx(-60, 'SAMPLE MART', 2600, '食費'),
-    tx(-75, 'APPLE COM BILL', 1200, 'サブスク'),
     tx(-90, 'SAMPLE MART', 2900, '食費'),
+    ...fixedRows(),
     { id: 'h_mock1', type: '支出', date: d(-2), merchant: '', amount: 300, payMonth: '', status: '手入力', category: '食費', categoryBy: '個別', source: '手入力', memo: 'コンビニ' },
     ...[[-3, 5000, 'お小遣い'], [-11, 52000, 'バイト代'], [-41, 48000, 'バイト代']].map(([o, amount, memo], i) => (
       { id: `h_inc${i}`, type: '収入', date: d(o), merchant: '', amount, payMonth: '', status: '手入力', category: '', categoryBy: '', source: '手入力', memo })),
@@ -70,7 +80,7 @@ const DB = {
   ].map(([name, group], i) => ({ name, group, order: i + 1 })),
   rules: [
     { merchant: 'SAMPLE MART', category: '食費', displayName: '' }, { merchant: 'JR EAST', category: '交通費', displayName: '' },
-    { merchant: 'APPLE COM BILL', category: 'サブスク', displayName: 'Apple One' },
+    { merchant: 'APPLE COM BILL', category: 'サブスク', displayName: 'Apple One' }, { merchant: 'VIDEO SERVICE', category: 'サブスク', displayName: '動画サービス' },
   ],
   budgets: [{ month: '', target: '全体', amount: 50000 }],
   assets: [...assetRows(3, 182000, 61200, 60000), ...assetRows(2, 176500, 70300, 70000), ...assetRows(1, 190300, 81900, 80000)],

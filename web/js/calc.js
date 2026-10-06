@@ -388,6 +388,93 @@ export function assetDue(assets, today) {
   return (assets || []).some(a => a.date >= ymd(from)) ? null : { label, date: ymd(date) };
 }
 
+// ---- 固定費（S-12。10/7 本人：毎月いくらか・推移・サブスクごと・今月まだ来ていないもの） ----
+
+export const FIXED_GROUP = '固定費';
+
+/** 固定費のカテゴリ：グループが「固定費」のもの（いまはサブスク・通信費）。カテゴリの並び順。 */
+export function fixedCategories(categories) {
+  return categories.filter(c => c.group === FIXED_GROUP).map(c => c.name);
+}
+
+/** 'YYYY-MM' を n か月ずらす。 */
+export function addMonths(month, n) {
+  return ym(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + n, 1));
+}
+
+/**
+ * 固定費のまとめ。月は利用日で数える（ほかの画面と同じ）。今日より後の日付の行は入れない。
+ * - months：[{ month, total, byCat: { カテゴリ: 円 }, expected }] 古い順、今月まで最大 n か月（データのある月から）。expected は今月だけ（まだ来ていない分）
+ * - thisMonth：今月（1日〜今日）の合計、lastMonth：先月まるごとの合計、forecast：今月の見込み（thisMonth＋まだ来ていない分）
+ * - pending：今月まだ来ていないもの [{ key, name, category, amount, day, late }]
+ *     先月あったのに今月まだのもの。同じ店で先月より回数が少ないときは、金額の合わない分（例：APPLE が先月2回・今月1回）
+ *     day は先月来た日（今月にその日がなければ月末）、late はその日を過ぎてもまだのもの
+ * - items：いまの固定費（今月か先月に来た店）[{ key, name, category, amount, days, change, arrived, lastId }] 金額の多い順
+ *     amount は今月分がそろっていれば今月、まだなら先月の合計。change は、その前の月から回数が同じで金額が変わったときの差
+ * 店は利用先（表記ゆれはそろえる）でまとめ、名前は 店の表示名 → この行の名前 → 利用先 の順。利用先のない手入力は名前かカテゴリでまとめる。
+ */
+export function fixedSummary(txs, categories, rules, today, n = 12) {
+  const cats = fixedCategories(categories);
+  const names = displayNames(rules);
+  const cur = ym(today), prev = addMonths(cur, -1), todayStr = ymd(today);
+  const list = txs.filter(t => isSpend(t) && cats.includes(t.category) && t.date <= todayStr);
+
+  // 店ごとにまとめる
+  const byItem = new Map();
+  list.forEach(t => {
+    const key = t.merchant ? 'm:' + normalizeMerchant(t.merchant) : 'h:' + (t.memo || t.category);
+    if (!byItem.has(key)) byItem.set(key, { key, merchant: t.merchant || '', charges: [] });
+    byItem.get(key).charges.push(t);
+  });
+  const inMonth = (it, m) => it.charges.filter(t => t.date.slice(0, 7) === m).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const lastDay = lastDayOfMonth(today.getFullYear(), today.getMonth());
+
+  const pending = [], items = [];
+  byItem.forEach(it => {
+    const newest = [...it.charges].sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+    const name = (it.merchant && names.get(normalizeMerchant(it.merchant))) || newest.memo || it.merchant || newest.category;
+    const base = { key: it.key, name, category: newest.category, lastId: newest.id };
+    const now = inMonth(it, cur), before = inMonth(it, prev);
+    // 今月まだ来ていない分：先月の利用から、今月と同じ金額のものを消していき、残ったもの（回数の差の分だけ、遅い日のほう）
+    if (before.length > now.length) {
+      const left = now.map(t => t.amount);
+      const rest = before.filter(t => { const i = left.indexOf(t.amount); if (i < 0) return true; left.splice(i, 1); return false; });
+      rest.slice(-(before.length - now.length)).forEach(t => {
+        const day = Math.min(Number(t.date.slice(8, 10)), lastDay);
+        pending.push({ ...base, amount: t.amount, day, late: day < today.getDate() });
+      });
+    }
+    if (!now.length && !before.length) return; // 先月も今月も来ていない＝もう止めたもの（推移には残る）
+    const arrived = now.length > 0 && now.length >= before.length;
+    const shownMonth = arrived ? cur : prev;
+    const shown = arrived ? now : before;
+    const prior = inMonth(it, addMonths(shownMonth, -1));
+    const amount = sum(shown);
+    items.push({
+      ...base, amount, arrived,
+      days: [...new Set(shown.map(t => Number(t.date.slice(8, 10))))],
+      change: prior.length === shown.length && prior.length ? amount - sum(prior) : 0,
+    });
+  });
+  items.sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name, 'ja'));
+  pending.sort((a, b) => a.day - b.day);
+
+  // 月ごとの推移：データのある最初の月（固定費に限らず）から、今月まで
+  const firstSeen = txs.filter(isSpend).map(t => t.date.slice(0, 7)).sort()[0] || cur;
+  const first = firstSeen < cur ? firstSeen : cur;
+  const months = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const m = addMonths(cur, -i);
+    if (m < first) continue;
+    const inM = list.filter(t => t.date.slice(0, 7) === m);
+    const byCat = Object.fromEntries(cats.map(c => [c, sum(inM.filter(t => t.category === c))]));
+    months.push({ month: m, total: sum(inM), byCat, expected: m === cur ? sum(pending) : 0 });
+  }
+  const thisMonth = months.at(-1).total;
+  const lastMonth = months.length > 1 ? months.at(-2).total : 0;
+  return { cats, months, thisMonth, lastMonth, forecast: thisMonth + sum(pending), pending, items };
+}
+
 // ---- 表示 ----
 
 export function yen(n) {

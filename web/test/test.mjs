@@ -134,6 +134,47 @@ test('名前（サブタイトル）：この利用だけの名前 → 店の表
   assert.strictEqual(C.subtitleOf({ merchant: '', memo: '' }, names), '');
 });
 
+test('固定費：今月・先月・見込み・まだ来ていないもの・店ごとの一覧・推移', () => {
+  const cats = [{ name: '食費', group: '暮らし' }, { name: 'サブスク', group: '固定費' }, { name: '通信費', group: '固定費' }];
+  const rules = [{ merchant: 'GOOGLE YOUTUBEPR', category: 'サブスク', displayName: 'YouTube Premium' }];
+  const sub = (date, amount, merchant, extra = {}) => tx(date, amount, { category: 'サブスク', merchant, id: `${merchant}_${date}`, ...extra });
+  const txs = [
+    tx('2026-01-10', 500, { merchant: 'SAMPLE MART' }),                  // データの最初の月（固定費ではない）
+    sub('2026-08-22', 1280, 'GOOGLE YOUTUBEPR'), sub('2026-09-22', 1280, 'google  youtubepr'), // 表記ゆれも同じ店。今月はまだ（22日ごろ）
+    sub('2026-09-05', 1490, 'NETFLIX.COM'), sub('2026-10-05', 1590, 'Netflix.com '),          // 今月来た・100円上がった（表記ゆれ）
+    sub('2026-09-03', 130, 'APPLE COM BILL'), sub('2026-09-20', 450, 'APPLE COM BILL'), sub('2026-10-03', 130, 'APPLE COM BILL'), // 2回のうち1回まだ
+    sub('2026-08-03', 130, 'APPLE COM BILL'),                            // 8月は1回だけ → 9月（2回）と金額を比べない
+    sub('2026-09-02', 300, 'AMAZON DIGITAL'), sub('2026-09-15', 600, 'AMAZON DIGITAL'), sub('2026-10-02', 600, 'AMAZON DIGITAL'), // 遅いほうが先に来た → まだは 300
+    sub('2026-09-04', 100, 'CLOUD SVC'), sub('2026-09-18', 200, 'CLOUD SVC'), sub('2026-10-04', 110, 'CLOUD SVC'), // 値段が変わって1回足りない → まだは 200 だけ
+    sub('2026-09-01', 2970, 'POVO', { category: '通信費' }),            // 1日ごろのはずが、まだ
+    sub('2026-07-15', 980, 'OLD SUB'),                                   // もう止めた（一覧には出ない・推移には残る）
+    sub('2026-09-25', 4000, '', { category: '通信費', source: '手入力', status: '手入力', memo: '家のネット' }),
+    sub('2026-10-01', 4000, '', { category: '通信費', source: '手入力', status: '手入力', memo: '家のネット', id: 'net2' }),
+    sub('2026-10-20', 999, 'FUTURE'), sub('2026-10-02', 777, 'CANCELLED', { status: '取消' }),  // 今日より後・取消は入れない
+  ];
+  const f = C.fixedSummary(txs, cats, rules, D(2026, 10, 7));
+  assert.deepStrictEqual(f.cats, ['サブスク', '通信費']);
+  assert.deepStrictEqual([f.thisMonth, f.lastMonth, f.forecast], [6430, 11520, 11630]);
+  assert.deepStrictEqual(f.pending.map(p => [p.name, p.amount, p.day, p.late]), [
+    ['POVO', 2970, 1, true], ['AMAZON DIGITAL', 300, 2, true], ['CLOUD SVC', 200, 18, false], ['APPLE COM BILL', 450, 20, false], ['YouTube Premium', 1280, 22, false]]);
+  assert.deepStrictEqual(f.items.map(i => [i.name, i.amount, i.arrived, i.change, i.days.join(',')]), [
+    ['家のネット', 4000, true, 0, '1'], ['POVO', 2970, false, 0, '1'], ['NETFLIX.COM', 1590, true, 100, '5'],
+    ['YouTube Premium', 1280, false, 0, '22'], ['AMAZON DIGITAL', 900, false, 0, '2,15'], ['APPLE COM BILL', 580, false, 0, '3,20'], ['CLOUD SVC', 300, false, 0, '4,18']]);
+  assert.strictEqual(f.items[0].lastId, 'net2'); // 押すと、いちばん新しい利用の詳細が開く
+  assert.deepStrictEqual([f.months.length, f.months[0].month, f.months.at(-1).month], [10, '2026-01', '2026-10']);
+  assert.deepStrictEqual(f.months.at(-1), { month: '2026-10', total: 6430, byCat: { 'サブスク': 2430, '通信費': 4000 }, expected: 5200 });
+  assert.deepStrictEqual([f.months[6].month, f.months[6].total, f.months[7].total, f.months[6].expected], ['2026-07', 980, 1410, 0]);
+  // 月の初め（今月まだ何も来ていない）：今月 0・見込みは先月の分
+  const g = C.fixedSummary(txs.filter(t => t.date < '2026-10-01'), cats, rules, D(2026, 10, 1));
+  assert.deepStrictEqual([g.thisMonth, g.forecast, g.items.every(i => !i.arrived)], [0, 11520, true]);
+  // 先月31日に来たもの：今月（11月）に31日はないので、30日ごろ
+  const h = C.fixedSummary([sub('2026-10-31', 500, 'MONTH END')], cats, rules, D(2026, 11, 5));
+  assert.deepStrictEqual(h.pending.map(p => [p.day, p.late]), [[30, false]]);
+  // 固定費がない・データがない
+  assert.deepStrictEqual(C.fixedSummary([], cats, [], D(2026, 10, 7)).months, [{ month: '2026-10', total: 0, byCat: { 'サブスク': 0, '通信費': 0 }, expected: 0 }]);
+  assert.strictEqual(C.addMonths('2026-01', -1), '2025-12');
+});
+
 test('予算：その月だけの予算 → 毎月の予算 → なし の順。やめた（0）予算は使わない', () => {
   const b = [{ month: '', target: '全体', amount: 50000 }, { month: '2026-10', target: '全体', amount: 60000 }, { month: '2026-11', target: '全体', amount: 0 }];
   assert.deepStrictEqual(C.budgetFor(b, '2026-10'), { amount: 60000, monthly: false });

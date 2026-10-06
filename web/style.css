@@ -421,6 +421,28 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 .only-income, .only-spend { animation: fade-in .3s var(--ease) both; }
 .name-chips { margin-top: 12px; }
 
+/* ---- 固定費（S-12） ---- */
+/* ホームのカード：左に名前と一言、右に今月の見込み */
+.fixed-mini { margin: 12px 20px 0; padding: 14px 14px 14px 18px; border-radius: 20px; display: flex; align-items: center; gap: 10px; }
+.fixed-mini > span:first-child { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.fixed-mini small { font-size: 11px; color: var(--ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fixed-mini small .money { color: var(--ink2); }
+.fixed-mini .num { font-family: var(--font-num); font-weight: var(--num-weight); font-size: 21px; white-space: nowrap; }
+.fixed-mini > svg { width: 16px; height: 16px; color: var(--ink2); flex-shrink: 0; }
+.fixed-main { margin: 10px 20px 0; padding: 26px 24px 22px; text-align: center; border-radius: 28px; box-shadow: 0 10px 40px rgba(0,0,0,.06); }
+.fixed-main .compare + .compare { margin-top: 4px; }
+.fixed-chart { margin-top: 14px; }
+/* 固定費の棒：カテゴリごとに固定費の色の濃さを変え、まだ来ていない分は斜線 */
+.part.f0 { color: var(--g2); }
+.part.f1 { color: color-mix(in srgb, var(--g2) 55%, var(--card)); }
+.part.f2 { color: color-mix(in srgb, var(--g2) 30%, var(--card)); }
+.bar .part.exp, .bar-legend .part.exp { background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--g2) 55%, transparent) 0 2px, transparent 2px 5px); }
+.bar-legend .part.exp { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--g2) 55%, transparent); }
+.badge.warn { color: var(--warn); border-color: var(--warn); }
+.row .a small.chg { display: block; font-family: var(--font-body); font-size: 10px; text-align: right; color: var(--ink2); }
+.row .a small.chg.up { color: var(--warn); }
+.fixed-note { margin: 8px 24px 0; }
+
 /* ---- CSV の照合（S-09） ---- */
 .file-btn { cursor: pointer; }
 .file-btn input { display: none; }

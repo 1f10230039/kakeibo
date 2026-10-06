@@ -8,7 +8,7 @@
 
 import * as C from '../calc.js';
 import { GROUP_CLASS } from '../icons.js';
-import { esc, money, icon, onSwipe, seg, tween } from '../ui.js';
+import { esc, money, icon, onSwipe, seg, tween, liftValue } from '../ui.js';
 import { row } from './home.js';
 import { incomeRow } from './income.js';
 
@@ -208,31 +208,6 @@ function byCategory(list, groupOf, hidden, names) {
       <div class="list card" data-key="c:${esc(g.name)}">${C.newestFirst(g.txs).map(t => (t.type === '収入' ? incomeRow(t, hidden)
         : row(t, groupOf(t.category), hidden, '', C.subtitleOf(t, names) || t.category || '未分類'))).join('')}</div>`)
     .join('');
-}
-
-const placed = new WeakSet(); // もう位置を決めた金額の札
-
-/**
- * 選んだ棒の金額の札：棒より横に広いので、となりの棒のほうが高いと隠れる（10/7 本人）。
- * 札が横に重なる棒のうち、いちばん高い棒（伸び縮みし終わったときの高さ）より上に出す。初めて出たときは、動かさずにその場所に置く。
- */
-function liftValue(root) {
-  const val = root.querySelector('.bar .val');
-  if (!val) return;
-  const cols = [...root.querySelectorAll('.bar .col')];
-  const own = val.parentElement, i = cols.indexOf(own), w = val.offsetWidth, r = own.getBoundingClientRect();
-  const left = i === 0 ? r.left : i === cols.length - 1 ? r.right - w : (r.left + r.right - w) / 2; // CSS と同じ寄せ方（端の棒は内側へ）
-  const heightOf = c => Number(/--h:([\d.]+)/.exec(c.dataset.vars || '')?.[1] || 0);
-  const lift = Math.max(0, ...cols.filter(c => {
-    const b = c.getBoundingClientRect();
-    return b.right > left + 2 && b.left < left + w - 2; // 角の丸みにかするだけなら数えない
-  }).map(heightOf));
-  if (placed.has(val)) { val.style.setProperty('--lift', lift); return; }
-  placed.add(val);
-  val.style.transition = 'none';
-  val.style.setProperty('--lift', lift);
-  void val.offsetWidth; // いまの位置で一度描いてから、動きを戻す
-  val.style.transition = '';
 }
 
 export function mount(root, ctx) {

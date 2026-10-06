@@ -23,6 +23,8 @@ export function render(ctx) {
   const assetsNow = C.assetHistory(data.assets).at(-1);
   const assetDue = C.assetDue(data.assets, today);
   const hasIncome = txs.some(C.isIncome);
+  const fixed = C.fixedSummary(txs, data.categories, data.rules, today);
+  const hasFixed = fixed.forecast > 0 || fixed.lastMonth > 0;
 
   const unclassified = C.unclassified(txs).length;
   const stale = C.staleSokuho(txs, today).length;
@@ -65,6 +67,11 @@ export function render(ctx) {
           <div class="soon">${sp ? 'カード代を引いた額' : '資産を記録すると出ます'}</div>
           ${assetsNow ? `<div class="asset-total">資産の合計 ${money(assetsNow.total, hidden)}</div>` : ''}</a>
       </div>
+
+      <a class="fixed-mini card" href="#/fixed" aria-label="固定費の画面へ">
+        <span><span class="label">固定費</span><small>${hasFixed ? `今月の見込み・先月 ${money(fixed.lastMonth, hidden)}` : `${esc(fixed.cats.join('・'))}のカテゴリを付けると出ます`}</small></span>
+        <span class="num">${hasFixed ? money(fixed.forecast, hidden) : '<span class="muted">—</span>'}</span>${icon('chevron')}
+      </a>
 
       <div class="due"><span>${esc(C.mdw(debit.date))} 引き落とし予定</span><span class="num">${money(debit.amount, hidden)}</span></div>
 
