@@ -163,17 +163,6 @@ async function write(promise, doneText) {
 // iPhone では、指で触れている間の見た目（:active）は、どこかで touchstart を受けていないと出ない
 document.addEventListener('touchstart', () => {}, { passive: true });
 
-// 四隅が丸い iPhone をホーム画面から開いたとき（全画面で、下にホームバーの余白がある）だけ、タブバーを画面の角に沿わせる
-{
-  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
-  const probe = document.createElement('div');
-  probe.className = 'safe-probe';
-  document.body.appendChild(probe);
-  const bottomInset = parseFloat(getComputedStyle(probe).paddingBottom) || 0;
-  probe.remove();
-  if (standalone && bottomInset > 0 && screen.width <= 500) document.documentElement.classList.add('round-screen');
-}
-
 window.addEventListener('hashchange', () => {
   closeSheet();
   const { name, query } = route();

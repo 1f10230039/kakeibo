@@ -49,7 +49,6 @@ button, a { transition: scale .22s var(--ease), background-color .25s, color .25
 :is(.btn, .chip, .pick, .icon-btn, .nav, .back, .sheet-close, .more, .tab, .seg button, .legend-cat):active:not(:disabled) { scale: .94; transition-duration: .08s; }
 .tile:active { scale: .97; transition-duration: .1s; }
 :is(button, a).row:active, .legend-row:active { background-color: var(--soft); transition-duration: .05s; }
-.safe-probe { position: fixed; padding-bottom: env(safe-area-inset-bottom); visibility: hidden; pointer-events: none; }
 svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .money, .big, .num, .amt, .a, .rank, .val { font-variant-numeric: lining-nums; }
 
@@ -314,8 +313,15 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
 
 /* ---- タブバー ---- */
 /* 4つのタブを同じ幅で並べ、選んでいるタブの後ろの丸い背景（.tab-pill）が、タブを替えるとすべって動く */
-.tabbar { --tab-i: 0; position: fixed; z-index: 10; left: 0; right: 0; margin: 0 auto; bottom: var(--tab-bottom); width: min(448px, calc(100% - 24px));
-  height: 68px; padding: 0 6px; border-radius: 30px; background: var(--tab-bg); backdrop-filter: blur(16px) saturate(1.3); -webkit-backdrop-filter: blur(16px) saturate(1.3);
+/* 形：左右と下のふちとの空きを --edge にそろえ、下の角は画面の角と同じ中心で丸める（半径＝画面の角 − 空き）。
+   アイコンの並びは下から --tab-bottom の高さ（iPhone では 48px）に置き、その下（ホームバーのところ）はバーを伸ばして埋める。
+   下に余白がない画面（Safari のタブなど）では、伸ばす分が 0 になり、ふつうの丸いバーになる。
+   10/6：「ホーム画面アプリのときだけこの形」と JS で見分けていたが、本人の iPhone では見分けられず、前の形のままだった。
+   なので見分けをやめ、どこでもこの形にした */
+.tabbar { --tab-i: 0; --tab-pad: max(0px, calc(var(--tab-bottom) - var(--edge)));
+  position: fixed; z-index: 10; left: var(--edge); right: var(--edge); bottom: var(--edge); max-width: 448px; margin: 0 auto;
+  height: calc(68px + var(--tab-pad)); padding: 0 6px var(--tab-pad); border-radius: 34px 34px calc(var(--screen-r) - var(--edge)) calc(var(--screen-r) - var(--edge));
+  background: var(--tab-bg); backdrop-filter: blur(16px) saturate(1.3); -webkit-backdrop-filter: blur(16px) saturate(1.3);
   display: grid; grid-template-columns: repeat(4, 1fr); align-items: start; box-shadow: 0 8px 32px rgba(0,0,0,.10); transition: background-color .4s; }
 .tabbar[hidden] { display: none; }
 .tab { position: relative; z-index: 1; height: 68px; display: grid; place-content: center; justify-items: center; gap: 3px; font-size: 11px; color: var(--ink2); letter-spacing: .06em; }
@@ -327,11 +333,6 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
   transform: translateX(calc(var(--tab-i) * 100%)); transition: transform .55s var(--spring), opacity .3s; }
 .tab-pill::before { content: ""; position: absolute; inset: 0 5px; border-radius: 22px; background: var(--soft); }
 .tabbar.no-pill .tab-pill { opacity: 0; }
-/* 四隅が丸い iPhone のホーム画面アプリ（app.js が round-screen を付ける）：バーを左右と下のふちまで広げて空きを --edge にそろえ、
-   下の角は画面の角と同じ中心で丸める（半径＝画面の角 − 空き）。アイコンの並びの高さは上と同じ（下から --tab-bottom） */
-.round-screen .tabbar { left: var(--edge); right: var(--edge); bottom: var(--edge); width: auto; margin: 0;
-  height: calc(var(--tab-bottom) - var(--edge) + 68px); padding-bottom: calc(var(--tab-bottom) - var(--edge));
-  border-radius: 34px 34px calc(var(--screen-r) - var(--edge)) calc(var(--screen-r) - var(--edge)); }
 
 /* ---- お知らせ・読み込み中 ---- */
 .toast { position: fixed; z-index: 30; left: 50%; bottom: calc(88px + var(--tab-bottom)); transform: translate(-50%, 14px) scale(.92); opacity: 0;
@@ -370,7 +371,7 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
 /* ---- PC（幅 900px 以上）：タブバー → 左の縦メニュー、ホームと統計は2列 ---- */
 @media (min-width: 900px) {
   #app { max-width: 1080px; margin-left: 220px; margin-right: auto; padding: 28px 32px 48px; }
-  .tabbar { left: 0; right: auto; margin: 0; top: 0; bottom: 0; width: 200px; height: auto; border-radius: 0; display: flex; flex-direction: column; justify-content: flex-start;
+  .tabbar { left: 0; right: auto; margin: 0; top: 0; bottom: 0; width: 200px; max-width: none; height: auto; border-radius: 0; display: flex; flex-direction: column; justify-content: flex-start;
     align-items: stretch; gap: 4px; padding: 32px 14px; box-shadow: none; border-right: 1px solid var(--line); background: var(--bg); }
   .tab-pill { display: none; }
   .tab { display: flex; gap: 12px; align-items: center; height: auto; font-size: 14px; padding: 11px 14px; border-radius: 14px; }
