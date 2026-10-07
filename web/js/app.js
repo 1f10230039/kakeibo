@@ -24,7 +24,7 @@ const TABS = [['home', 'ホーム'], ['stats', '統計'], ['budget', '予算'], 
 // 画面の深さ。深いほうへ進むときは右から、戻るときは左から入ってくる。同じ深さ（タブどうし）は下からふわっと
 const DEPTH = { menu: 1, unclassified: 1, stale: 1, income: 1, fixed: 1, rules: 2, days: 2, csv: 2 };
 // 画面に入ったとき、上から順に少しずつ遅らせて出す部分
-const RISE = '.spend, .income-main, .fixed-main, .fixed-chart, .fixed-mini, .csv-summary, .budget-main, .budget-empty, .asset-main, .asset-chart, .asset-spend, .asset-empty, .pair, .due, .todo, .home-side > *, .page-head, .controls, .period, .chart, .tx-list > *, .lead, .menu-group-label, .list, .progress, .sort-card, .switch-row, .field, .picker-group, .btn.wide, .note, .credit, .empty';
+const RISE = '.spend, .income-main, .fixed-main, .fixed-chart, .fixed-mini, .csv-summary, .budget-main, .budget-empty, .asset-main, .asset-chart, .asset-spend, .asset-empty, .pair, .due, .todo, .home-side > *, .page-head, .controls, .period, .chart, .stats-top, .tx-list > *, .lead, .menu-group-label, .list, .progress, .sort-card, .switch-row, .field, .picker-group, .btn.wide, .note, .credit, .empty';
 
 const state = { data: null, fetchedAt: 0, hidden: readHidden(), loading: false };
 // 画面に出すデータ（state.data）＝ サーバーから最後に取れたデータ（server）＋ まだ返事の来ていない保存（pending）

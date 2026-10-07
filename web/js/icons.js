@@ -19,7 +19,7 @@ const CATEGORY_ICON = {
 /** タイルの写真（images/category/）。未分類は写真なし。 */
 export const CATEGORY_PHOTO = {
   '食費': 'food', '日用品': 'daily', '交通費': 'transport', '健康・医療': 'health', 'サブスク': 'subscription',
-  '通信費': 'telecom', '趣味・娯楽': 'hobby', '衣服': 'clothes', '美容': 'beauty', '交際費': 'social', 'その他': 'other',
+  '通信費': 'telecom', '趣味・娯楽': 'hobby', '衣服': 'clothes', '美容': 'beauty', '交際費': 'social', 'その他': 'other', '積立・投資': 'invest',
 };
 
 export const GROUP_CLASS = { '暮らし': 'g1', '固定費': 'g2', 'たのしみ': 'g3', 'その他': 'g4', '未分類': 'g0' };

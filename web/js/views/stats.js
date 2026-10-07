@@ -5,15 +5,17 @@
 // 円は前の割合から新しい割合へ動く（初めて出たときは、ぐるっと描かれる）。
 // 一覧は日付順とカテゴリー別を切り替えられる（10/7 本人）。カテゴリー別は合計の多い順、収入の一覧では名前（バイト代など）ごと。
 // 棒グラフは、グループの色の積み上げ・右に縦の目盛り・月の横軸は端の日付だけ（10/7 本人）。
+// グラフと一覧の間に、その期間の支出トップ（ホームと同じ写真のカード・5つまで。10/7 本人）。押すと一覧をそのカテゴリで絞り込む（棒グラフのままでも）。
 
 import * as C from '../calc.js';
 import { GROUP_CLASS } from '../icons.js';
 import { esc, money, icon, onSwipe, seg, tween, liftValue } from '../ui.js';
-import { row } from './home.js';
+import { row, topTile } from './home.js';
 import { incomeRow } from './income.js';
 
 const UNIT_NAME = { week: '週', month: '月', year: '年' };
 const view = { unit: 'month', offset: 0, chart: 'bar', flow: '支出', bucket: null, group: null, cat: null, dir: 0, sort: 'date' };
+let groupOfNow = () => 'その他'; // いまのデータでカテゴリのグループを引く（render で入れ替える。押したときに使う）
 
 export const morphable = true;
 
@@ -30,6 +32,7 @@ export function render(ctx) {
   const p = C.period(view.unit, view.offset, today, data.settings.weekStart);
   const inPeriod = C.spendBetween(data.transactions, p.start, p.end);
   const groupOf = name => (!name || name === '未分類' ? '未分類' : (data.categories.find(c => c.name === name) || { group: 'その他' }).group);
+  groupOfNow = groupOf;
   if (view.cat && !view.group) view.group = groupOf(view.cat); // カテゴリから来たら、そのグループの内訳を開いておく
 
   const incomesInPeriod = C.incomeBetween(data.transactions, p.start, p.end);
@@ -43,13 +46,15 @@ export function render(ctx) {
     list = pick(list, b.start, b.end);
     filterLabel = detailOf(b) || b.label;
   }
-  if (view.chart === 'pie' && view.cat) {
+  if (view.cat && !showIncome) { // 円の内訳か、支出トップのカードで選んだカテゴリ
     list = list.filter(t => (t.category || '未分類') === view.cat);
     filterLabel = view.cat;
   } else if (view.chart === 'pie' && view.group) {
     list = list.filter(t => groupOf(t.category) === view.group);
     filterLabel = view.group;
   }
+
+  const top = showIncome ? [] : C.categoryTotals(inPeriod).slice(0, 5);
 
   return `
   <div class="stats page" data-dir="${view.dir}">
@@ -65,6 +70,7 @@ export function render(ctx) {
     </div>
 
     <div class="stats-body">
+      <div class="stats-main">
       <section class="chart card" id="chart">
         ${view.chart === 'bar'
           ? `<div class="chart-total">${seg('flow', [['支出', '支出'], ['収入', '収入']], view.flow, 'グラフに出すもの')}${money(C.sum(showIncome ? incomesInPeriod : inPeriod), hidden, 'stats-total')}</div>
@@ -75,6 +81,12 @@ export function render(ctx) {
              ${incomesInPeriod.length ? `<div class="chart-income" data-key="inc"><span class="label">収入</span><span class="pos">+${money(C.sum(incomesInPeriod), hidden)}</span></div>` : ''}
              ${pieChart(C.groupTotals(inPeriod, data.categories), hidden)}`}
       </section>
+      ${top.length ? `<section class="stats-top" data-key="top">
+        <div class="section"><h2>支出トップ</h2></div>
+        <div class="tiles${view.cat ? ' picked' : ''}" data-key="tiles">${top.map((c, i) => topTile(c, i, hidden,
+          `button type="button" data-top="${esc(c.name)}" aria-pressed="${view.cat === c.name}"`, `top:${c.name}`, view.cat === c.name ? ' on' : '')).join('')}</div>
+      </section>` : ''}
+      </div>
 
       <section class="tx-list">
         <div class="section"><h2>一覧</h2>${seg('sort', [['date', '日付順'], ['cat', showIncome ? '名前別' : 'カテゴリー別']], view.sort, '一覧の並べ方')}</div>
@@ -215,15 +227,16 @@ export function mount(root, ctx) {
   pieShown.clear(); // 画面に入るたびに、円はぐるっと描き直す
   const go = changes => { Object.assign(view, { dir: 0 }, changes); ctx.rerender(); };
   page.addEventListener('click', e => {
-    const el = e.target.closest('[data-unit], [data-chart], [data-flow], [data-sort], [data-step], [data-bucket], [data-group], [data-cat], [data-act="clear"], [data-tx]');
+    const el = e.target.closest('[data-unit], [data-chart], [data-flow], [data-sort], [data-step], [data-bucket], [data-group], [data-cat], [data-top], [data-act="clear"], [data-tx]');
     if (!el) return;
     const d = el.dataset;
-    if (d.unit) { if (d.unit !== view.unit) go({ unit: d.unit, offset: 0, bucket: null }); }
+    if (d.unit) { if (d.unit !== view.unit) { go({ unit: d.unit, offset: 0, bucket: null }); toFirstTile(); } }
     else if (d.sort) { if (d.sort !== view.sort) go({ sort: d.sort }); }
     else if (d.chart) { if (d.chart !== view.chart) go({ chart: d.chart, bucket: null, group: null, cat: null }); }
-    else if (d.flow) { if (d.flow !== view.flow) go({ flow: d.flow, bucket: null }); }
+    else if (d.flow) { if (d.flow !== view.flow) go({ flow: d.flow, bucket: null, cat: null }); }
     else if (d.step) step(+d.step);
-    else if (d.bucket !== undefined) go({ bucket: view.bucket === +d.bucket ? null : +d.bucket });
+    else if (d.bucket !== undefined) go({ bucket: view.bucket === +d.bucket ? null : +d.bucket, cat: null }); // 棒と支出トップの絞り込みは、どちらか1つ
+    else if (d.top) go(view.cat === d.top ? { cat: null } : { cat: d.top, group: groupOfNow(d.top), bucket: null });
     else if (d.group) go({ group: view.group === d.group ? null : d.group, cat: null });
     else if (d.cat) go({ cat: view.cat === d.cat ? null : d.cat });
     else if (d.act === 'clear') go({ bucket: null, group: null, cat: null });
@@ -234,7 +247,10 @@ export function mount(root, ctx) {
   function step(dir) {
     if (view.offset + dir > 0) return; // 未来には進まない
     go({ offset: view.offset + dir, bucket: null, dir });
+    toFirstTile();
   }
+  // 期間を変えたら、支出トップは1位から見せる
+  const toFirstTile = () => page.querySelector('.stats-top .tiles')?.scrollTo({ left: 0, behavior: 'smooth' });
 }
 
 export function after(root) {

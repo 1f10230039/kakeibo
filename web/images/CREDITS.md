@@ -108,3 +108,4 @@
 | category/beauty.webp | 美容 | photo-1567721913486-6585f069b332（石の上の黒い容器） |
 | category/social.webp | 交際費 | photo-1777464320942-4f080badb8c4（カフェで話す2人） |
 | category/other.webp | その他 | photo-1620275765334-4ed948bb4502（白いノートと黒いペン） |
+| category/invest.webp | 積立・投資 | photo-1723740683543-d394ba1d4366（土から芽を出した若い植物。10/7 追加・600×760 の WebP） |

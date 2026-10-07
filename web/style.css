@@ -137,6 +137,10 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
 .tile-plain .plain-icon svg { width: 44px; height: 44px; stroke-width: 1.2; }
 .tile-plain .rank { background: var(--soft); }
 .tile-plain::after { display: none; }
+/* 統計の支出トップ（10/7 本人：グラフと一覧の間）。カードはボタン。押したカテゴリ以外は薄く（棒グラフの .picked と同じ） */
+.stats-top .section { margin-top: 26px; }
+button.tile { text-align: left; padding: 0; font: inherit; }
+.tiles.picked .tile:not(.on) { opacity: .4; }
 .photo-food { background-image: url(images/category/food.webp); }
 .photo-daily { background-image: url(images/category/daily.webp); }
 .photo-transport { background-image: url(images/category/transport.webp); }
@@ -148,6 +152,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round
 .photo-beauty { background-image: url(images/category/beauty.webp); }
 .photo-social { background-image: url(images/category/social.webp); }
 .photo-other { background-image: url(images/category/other.webp); }
+.photo-invest { background-image: url(images/category/invest.webp); }
 
 /* ---- 一覧 ---- */
 .list { margin: 0 20px; padding: 4px 0; }
@@ -593,6 +598,8 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
   .home-side .section:first-child { margin-top: 0; }
   .stats-body { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
   .stats-body .tx-list .section { margin-top: 0; }
+  .stats-main { min-width: 0; } /* 左の列（グラフ＋支出トップ）。横にスクロールするカードで列が広がらないように */
+  .stats-main .tiles { padding: 0 20px 4px; }
   .budget.page, .assets.page { max-width: 560px; }
   .sheet { left: 50%; right: auto; bottom: 50%; width: 480px; border-radius: 26px; transform: translate(-50%, 60%); opacity: 0; transition: transform .4s var(--sheet), opacity .3s; }
   .sheet-wrap.open .sheet { transform: translate(-50%, 50%); opacity: 1; }

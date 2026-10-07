@@ -91,16 +91,27 @@ export function render(ctx) {
       <div class="section"><h2>支出トップ</h2>
         ${seg('range', [['week', '今週'], ['month', '今月']], topRange, '期間')}
       </div>
-      ${top.length ? `<div class="tiles">${top.slice(0, 5).map((c, i) => `
-        <a class="tile ${CATEGORY_PHOTO[c.name] ? 'photo-' + CATEGORY_PHOTO[c.name] : 'tile-plain'}" data-key="${topRange}:${esc(c.name)}" data-vars="--i:${i}" href="#/stats?cat=${encodeURIComponent(c.name)}&unit=${topRange}">
-          <span class="rank">${i + 1}</span>${CATEGORY_PHOTO[c.name] ? '' : `<span class="plain-icon">${categoryIcon('未分類')}</span>`}
-          <div class="cap"><div class="cat">${esc(c.name)}</div><div class="amt">${money(c.total, hidden)}</div></div>
-        </a>`).join('')}</div>` : `<p class="empty">${topRange === 'week' ? '今週' : '今月'}の支出はまだありません</p>`}
+      ${top.length ? `<div class="tiles">${top.slice(0, 5).map((c, i) => topTile(c, i, hidden,
+        `a href="#/stats?cat=${encodeURIComponent(c.name)}&unit=${topRange}"`, `${topRange}:${c.name}`)).join('')}</div>`
+        : `<p class="empty">${topRange === 'week' ? '今週' : '今月'}の支出はまだありません</p>`}
 
       <div class="section"><h2>最近の利用</h2><a class="more" href="#/stats">すべて ${icon('chevron')}</a></div>
       ${recent.length ? `<div class="list card">${recent.map(t => row(t, groupOf(t.category || '未分類'), hidden, C.subtitleOf(t, names))).join('')}</div>` : '<p class="empty">まだ利用がありません</p>'}
     </div>
   </div>`;
+}
+
+/**
+ * 支出トップの1枚（ホームと統計で使う）。open は開きタグの中身（'a href="…"' や 'button data-cat="…"'）、key は morph の data-key。
+ * 写真のないカテゴリ（未分類・あとで足したカテゴリ）は、そのカテゴリのアイコンを出す。
+ */
+export function topTile(c, i, hidden, open, key, extraClass = '') {
+  const photo = CATEGORY_PHOTO[c.name];
+  const tag = open.split(' ')[0];
+  return `<${open} class="tile ${photo ? 'photo-' + photo : 'tile-plain'}${extraClass}" data-key="${esc(key)}" data-vars="--i:${i}">
+    <span class="rank">${i + 1}</span>${photo ? '' : `<span class="plain-icon">${categoryIcon(c.name)}</span>`}
+    <div class="cap"><div class="cat">${esc(c.name)}</div><div class="amt">${money(c.total, hidden)}</div></div>
+  </${tag}>`;
 }
 
 export function row(t, group, hidden, sub = '', title = t.category || '未分類') {
