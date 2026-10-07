@@ -79,6 +79,28 @@ export function openSheet(innerHtml, onMount) {
   addClearButtons(wrap);
   applyVars(wrap); // シートの中の切り替えボタンの背景の位置
   onMount(sheet, close);
+  // 画面いっぱいまで伸びたシートは、ガラスを不透明に近づける（Apple の決まり。.sheet.tall）
+  requestAnimationFrame(() => sheet.classList.toggle('tall', sheet.offsetHeight > window.innerHeight * 0.8));
+}
+
+// ---- リキッドグラスの見た目（10/7 本人：iOS 27 の設定のスライダーのように、とても透明 〜 しっかり色付き） ----
+// 0〜100 をこの端末に保存し、CSS の --glass（0〜1）にする。初めは 40（iOS 27 の標準に近い濃さ）
+const KEY_GLASS = 'kakeibo.glass';
+export const GLASS_DEFAULT = 40;
+
+export function readGlass() {
+  try {
+    const raw = localStorage.getItem(KEY_GLASS);
+    const v = Number(raw);
+    return raw !== null && Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : GLASS_DEFAULT;
+  } catch (_) { return GLASS_DEFAULT; }
+}
+export function applyGlass(v) {
+  document.documentElement.style.setProperty('--glass', String(v / 100));
+}
+export function saveGlass(v) {
+  applyGlass(v);
+  try { localStorage.setItem(KEY_GLASS, String(v)); } catch (_) { /* 保存できなくても、いま開いている間は効く */ }
 }
 
 /** 上の取っ手のあたりを下へなぞると、指についてきて、80px より下で離すと閉じる。 */

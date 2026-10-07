@@ -3,7 +3,7 @@
 // 画面のファイルを直したら VERSION を上げる（古い保存を消して、新しいものを取り直すため）。
 // 取り直すときは、ブラウザの一時保存（GitHub Pages は10分使ってよいと返す）を通さずに取る。通すと、上げたあと10分ほど古いファイルが入ることがある。
 
-const VERSION = 'kakeibo-v33';
+const VERSION = 'kakeibo-v34';
 const SHELL = [
   './', 'index.html', 'style.css', 'manifest.webmanifest',
   'js/app.js', 'js/api.js', 'js/calc.js', 'js/csv.js', 'js/theme.js', 'js/days.js', 'js/icons.js', 'js/ui.js',

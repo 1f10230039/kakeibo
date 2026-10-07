@@ -3,7 +3,7 @@
 
 import * as api from './api.js';
 import { lookOf } from './theme.js';
-import { toast, saving, closeSheet, icon, addClearButtons, morph, applyVars, countUp, reduceMotion } from './ui.js';
+import { toast, saving, closeSheet, icon, addClearButtons, morph, applyVars, countUp, reduceMotion, readGlass, applyGlass } from './ui.js';
 import * as home from './views/home.js';
 import * as stats from './views/stats.js';
 import * as budget from './views/budget.js';
@@ -238,7 +238,25 @@ window.addEventListener('hashchange', () => {
   if (name === 'stats') stats.enter(query);
   render();
   window.scrollTo(0, 0);
+  nav.classList.remove('mini');
 });
+
+// リキッドグラス（10/7 本人）：ガラスの見た目（メニューのスライダー・この端末に保存）を、開いたときに当てる
+applyGlass(readGlass());
+
+// 下にスクロールしたらタブバーを小さく、上に戻したら元に（10/7 本人：iOS 26/27 のタブバーと同じ）。
+// 少しの揺れでは切り替えない（同じ向きに 24px 動いたら）。いちばん上のあたりでは、いつも元の大きさ。
+// あわせて、スクロールしたら上のふちをぼかす（.edge-top）
+let lastY = window.scrollY, run = 0;
+window.addEventListener('scroll', () => {
+  const y = window.scrollY, d = y - lastY;
+  lastY = y;
+  document.documentElement.classList.toggle('scrolled', y > 4);
+  if (y < 40) { nav.classList.remove('mini'); run = 0; return; }
+  run = Math.sign(d) === Math.sign(run) ? run + d : d;
+  if (run > 24) nav.classList.add('mini');
+  else if (run < -24) nav.classList.remove('mini');
+}, { passive: true });
 
 const cached = api.cachedData();
 if (cached) { server = cached.data; Object.assign(state, { data: structuredClone(cached.data), fetchedAt: cached.fetchedAt }); }

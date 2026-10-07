@@ -2,7 +2,7 @@
 
 import * as C from '../calc.js';
 import * as api from '../api.js';
-import { info, esc, money, icon, toast, seg, selectSeg, busy } from '../ui.js';
+import { info, esc, money, icon, toast, seg, selectSeg, busy, readGlass, saveGlass } from '../ui.js';
 import { categoryPicker, openDetail, saveTx } from './sheets.js';
 import { row } from './home.js';
 import { ANNIVERSARY_NAME_MAX } from '../days.js';
@@ -123,6 +123,8 @@ export const menu = {
       </div>
       <div class="menu-group-label">この端末</div>
       <div class="list card">
+        <div class="row"><span class="t"><b>ガラスの見た目${info('タブバーやシート、お知らせなど、画面の上に浮かぶ部品の見た目です（iOS 27 のリキッドグラスと同じ考え）。左ほど透明で後ろが透け、右ほど色が付いて読みやすくなります。\niPhone の「透明度を下げる」はアプリから読めないので、透けるのが苦手なときは右へ。この端末にだけ保存します。')}</b></span></div>
+        <label class="glass-slider"><span>透明</span><input type="range" min="0" max="100" step="5" value="${readGlass()}" aria-label="ガラスの見た目（透明〜色付き）"><span>色付き</span></label>
         <button class="row link" data-act="forget"><span class="t"><b>URL と合言葉を入れ直す</b><small>この端末に保存したものを消します</small></span>${icon('chevron')}</button>
       </div>
       <p class="credit">写真：Unsplash（Unsplash License）。一覧は images/CREDITS.md</p>
@@ -135,6 +137,8 @@ export const menu = {
       if (!(await ctx.write(api.setSetting('週の始まり', b.dataset.week), `週の始まりを${b.dataset.week}曜にしました`))) ctx.rerender();
     }));
     root.querySelector('[data-act="refresh"]').addEventListener('click', () => ctx.refresh(true));
+    const glass = root.querySelector('.glass-slider input');
+    glass.addEventListener('input', () => saveGlass(Number(glass.value))); // 動かしている間も、すぐ画面に出す
     root.querySelector('[data-act="forget"]').addEventListener('click', () => {
       if (!confirm('この端末に保存した URL と合言葉を消しますか？')) return;
       api.forgetCredentials();
