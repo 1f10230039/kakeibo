@@ -3,12 +3,12 @@
 // 画面のファイルを直したら VERSION を上げる（古い保存を消して、新しいものを取り直すため）。
 // 取り直すときは、ブラウザの一時保存（GitHub Pages は10分使ってよいと返す）を通さずに取る。通すと、上げたあと10分ほど古いファイルが入ることがある。
 
-const VERSION = 'kakeibo-v34';
+const VERSION = 'kakeibo-v35';
 const SHELL = [
   './', 'index.html', 'style.css', 'manifest.webmanifest',
   'js/app.js', 'js/api.js', 'js/calc.js', 'js/csv.js', 'js/theme.js', 'js/days.js', 'js/icons.js', 'js/ui.js',
   'js/views/home.js', 'js/views/stats.js', 'js/views/budget.js', 'js/views/assets.js', 'js/views/income.js', 'js/views/fixed.js', 'js/views/csvimport.js', 'js/views/sheets.js', 'js/views/pages.js',
-  'images/icon-192.png', 'images/apple-touch-icon.png',
+  'images/icon-192.png?v=2', 'images/apple-touch-icon.png?v=2',
 ];
 
 self.addEventListener('install', e => {
