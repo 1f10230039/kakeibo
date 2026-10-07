@@ -333,6 +333,15 @@ h3.date { font-size: 12px; font-weight: 500; color: var(--ink2); margin: 18px 24
 input[type="date"] { -webkit-appearance: none; appearance: none; display: block; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; text-align: left; }
 input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 1.5em; min-height: 1lh; }
 .field-row { display: flex; gap: 10px; margin-top: 12px; }
+/* 月と日を選ぶ欄（誕生日と記念日・S-13） */
+.md-pick { display: inline-flex; gap: 6px; flex-shrink: 0; }
+.md-pick select { font: inherit; font-size: 16px; color: var(--ink); background: var(--soft); border: 1px solid transparent; border-radius: 12px; padding: 8px 12px;
+  -webkit-appearance: none; appearance: none; text-align: center; }
+.md-pick select:focus { outline: none; border-color: var(--accent); }
+.add-day { padding-top: 12px; }
+.row + .add-day { border-top: 1px solid var(--line); }
+.add-day .field { margin: 0 0 10px; }
+.add-day-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .field-row .grow { flex: 1; }
 .amount-input { display: flex; align-items: baseline; justify-content: center; gap: 6px; padding: 14px; background: var(--soft); border-radius: 20px; }
 .amount-input span { font-family: var(--font-num); font-size: 26px; color: var(--ink2); }

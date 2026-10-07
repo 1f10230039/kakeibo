@@ -80,36 +80,46 @@ export function lastMonthToSameDay(txs, today) {
 // ⚠️ 特別な年だけの祝日（2019年の即位の日など）や、法律が変わったときは合わなくなる。
 // ⚠️ 春分の日・秋分の日は、天文の計算から出した近い式（1980〜2099年）。正式には前の年の2月に官報で決まる。
 
-const FIXED_HOLIDAYS = new Set(['1-1', '2-11', '2-23', '4-29', '5-3', '5-4', '5-5', '8-11', '11-3', '11-23']);
+// 日付の決まった祝日と、その名前（ホームの挨拶で使う・10/7）
+const FIXED_HOLIDAYS = new Map([['1-1', '元日'], ['2-11', '建国記念の日'], ['2-23', '天皇誕生日'], ['4-29', '昭和の日'], ['5-3', '憲法記念日'],
+  ['5-4', 'みどりの日'], ['5-5', 'こどもの日'], ['8-11', '山の日'], ['11-3', '文化の日'], ['11-23', '勤労感謝の日']]);
 
 /** その月の第 n 月曜の日付。 */
 function nthMonday(y, m0, n) {
   return 1 + ((8 - new Date(y, m0, 1).getDay()) % 7) + (n - 1) * 7;
 }
 
-/** 国民の祝日そのもの（振替休日・国民の休日は入れない）。 */
-function isNationalHoliday(d) {
+/** 国民の祝日そのものの名前（振替休日・国民の休日は入れない）。祝日でなければ ''。 */
+function nationalHolidayName(d) {
   const y = d.getFullYear(), m = d.getMonth() + 1, day = d.getDate();
-  if (FIXED_HOLIDAYS.has(`${m}-${day}`)) return true;
-  if ((m === 1 && day === nthMonday(y, 0, 2)) || (m === 7 && day === nthMonday(y, 6, 3))      // 成人の日・海の日
-    || (m === 9 && day === nthMonday(y, 8, 3)) || (m === 10 && day === nthMonday(y, 9, 2))) { // 敬老の日・スポーツの日
-    return true;
-  }
+  if (FIXED_HOLIDAYS.has(`${m}-${day}`)) return FIXED_HOLIDAYS.get(`${m}-${day}`);
+  if (m === 1 && day === nthMonday(y, 0, 2)) return '成人の日';
+  if (m === 7 && day === nthMonday(y, 6, 3)) return '海の日';
+  if (m === 9 && day === nthMonday(y, 8, 3)) return '敬老の日';
+  if (m === 10 && day === nthMonday(y, 9, 2)) return 'スポーツの日';
   const k = y - 1980, leap = Math.floor(k / 4);
-  if (m === 3 && day === Math.floor(20.8431 + 0.242194 * k - leap)) return true; // 春分の日
-  if (m === 9 && day === Math.floor(23.2488 + 0.242194 * k - leap)) return true; // 秋分の日
-  return false;
+  if (m === 3 && day === Math.floor(20.8431 + 0.242194 * k - leap)) return '春分の日';
+  if (m === 9 && day === Math.floor(23.2488 + 0.242194 * k - leap)) return '秋分の日';
+  return '';
+}
+
+const isNationalHoliday = d => nationalHolidayName(d) !== '';
+
+/** 祝日の名前（振替休日・国民の休日も）。祝日でなければ ''。 */
+export function holidayName(d) {
+  const name = nationalHolidayName(d);
+  if (name) return name;
+  // 振替休日：日曜の祝日のあと、いちばん近い祝日でない日（祝日が続くときは、続いた先の日）
+  for (let back = 1, p = addDays(d, -1); isNationalHoliday(p); back++, p = addDays(d, -back)) {
+    if (p.getDay() === 0) return '振替休日';
+  }
+  // 国民の休日：前の日と次の日がどちらも祝日の日
+  return isNationalHoliday(addDays(d, -1)) && isNationalHoliday(addDays(d, 1)) ? '国民の休日' : '';
 }
 
 /** 祝日・振替休日・国民の休日。 */
 export function isHoliday(d) {
-  if (isNationalHoliday(d)) return true;
-  // 振替休日：日曜の祝日のあと、いちばん近い祝日でない日（祝日が続くときは、続いた先の日）
-  for (let back = 1, p = addDays(d, -1); isNationalHoliday(p); back++, p = addDays(d, -back)) {
-    if (p.getDay() === 0) return true;
-  }
-  // 国民の休日：前の日と次の日がどちらも祝日の日
-  return isNationalHoliday(addDays(d, -1)) && isNationalHoliday(addDays(d, 1));
+  return holidayName(d) !== '';
 }
 
 /** 銀行の休み：土日・祝日・年末年始（12/31〜1/3）。 */

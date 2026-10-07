@@ -1,10 +1,11 @@
-// ホーム・統計・予算・資産以外の画面：S-00 合言葉、S-06 未分類の振り分け、確認が必要な速報、S-08 メニュー、S-10 対応表。
+// ホーム・統計・予算・資産以外の画面：S-00 合言葉、S-06 未分類の振り分け、確認が必要な速報、S-08 メニュー、S-10 対応表、S-13 誕生日と記念日。
 
 import * as C from '../calc.js';
 import * as api from '../api.js';
 import { info, esc, money, icon, toast, seg, selectSeg, busy } from '../ui.js';
 import { categoryPicker, openDetail, saveTx } from './sheets.js';
 import { row } from './home.js';
+import { ANNIVERSARY_NAME_MAX } from '../days.js';
 
 const backBar = (title, href = '#/home') => `<header class="page-head with-back"><a class="back" href="${href}" aria-label="戻る">${icon('back')}</a><h1>${esc(title)}</h1></header>`;
 
@@ -111,6 +112,7 @@ export const menu = {
           ${seg('week', [['月', '月曜'], ['日', '日曜']], s.weekStart, '週の始まり')}</div>
         <a class="row link" href="#/budget"><span class="t"><b>予算</b><small>${budgetLabel(ctx)}</small></span>${icon('chevron')}</a>
         <a class="row link" href="#/fixed"><span class="t"><b>固定費</b><small>毎月の固定費と推移・サブスクの一覧</small></span>${icon('chevron')}</a>
+        <a class="row link" href="#/days"><span class="t"><b>誕生日と記念日</b><small>${esc(daysLabel(ctx.data.days || []))}</small></span>${icon('chevron')}</a>
         <a class="row link" href="#/csv"><span class="t"><b>CSV の取り込みと照合</b><small>e-NAVI の明細の CSV と、メールの記録を照らし合わせる（パソコンで）</small></span>${icon('chevron')}</a>
       </div>
       <div class="menu-group-label">状態</div>
@@ -140,6 +142,14 @@ export const menu = {
     });
   },
 };
+
+/** メニューの「誕生日と記念日」の下に出す一言。 */
+function daysLabel(days) {
+  const b = days.find(d => d.kind === '誕生日');
+  const n = days.filter(d => d.kind === '記念日').length;
+  if (!b && !n) return 'その日は、ホームに決まった挨拶が出ます';
+  return [b && `誕生日 ${mdText(b.md)}`, n && `記念日 ${n}件`].filter(Boolean).join('・');
+}
 
 /** メニューの「予算」の下に出す一言。 */
 function budgetLabel(ctx) {
@@ -181,6 +191,102 @@ export const rules = {
       const m = editing;
       const restore = busy(e.currentTarget);
       if (await ctx.write(api.setRule(m, category, name), `「${m}」を保存しました`)) { editing = null; ctx.rerender(); } else restore();
+    });
+  },
+};
+
+// ---- S-13 誕生日と記念日（10/7 本人：誕生日＋好きな記念日をアプリで入れる。シートの「記念日」に保存） ----
+// その日はホームに決まった挨拶（誕生日は専用の写真も）が出る（js/days.js）。年は入れない（毎年その日に出す）。
+// 変えたものは下の「保存」でまとめて送る（1回の通信で全部を入れ替える）。
+
+const DAYS_INFO = '誕生日は「お誕生日おめでとうございます」と専用の写真、記念日は「今日は◯◯ですね」がホームに出ます。\n年は入れません（毎年その日に出ます）。2/29 は、うるう年でない年は 2/28 に出ます。\nここで入れたものは、スプレッドシートの「記念日」に保存されます。';
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+let daysDraft = null; // { birthday: 'MM-DD' | '', anniversaries: [{ name, md }] }
+
+const mdText = md => `${Number(md.slice(0, 2))}月${Number(md.slice(3))}日`;
+
+function draftOf(days) {
+  const b = days.find(d => d.kind === '誕生日');
+  return { birthday: b ? b.md : '', anniversaries: days.filter(d => d.kind === '記念日').map(d => ({ name: d.name, md: d.md })) };
+}
+
+const sameDraft = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+/** 月と日の選ぶ欄。empty なら「—」（まだ入れていない）を選べる。 */
+function mdPicker(id, md, empty) {
+  const m = md ? Number(md.slice(0, 2)) : 0, d = md ? Number(md.slice(3)) : 0;
+  const opts = (n, on, unit) => (empty ? `<option value="0"${on ? '' : ' selected'}>—</option>` : '')
+    + Array.from({ length: n }, (_, i) => `<option value="${i + 1}"${on === i + 1 ? ' selected' : ''}>${i + 1}${unit}</option>`).join('');
+  return `<span class="md-pick" data-md="${id}">
+    <select aria-label="月" data-part="m">${opts(12, m, '月')}</select>
+    <select aria-label="日" data-part="d">${opts(31, d, '日')}</select>
+  </span>`;
+}
+
+/** 選ぶ欄の値を 'MM-DD' に。どちらかが「—」なら ''、ない日（2/30 など）なら null。 */
+function readPicker(el) {
+  const m = Number(el.querySelector('[data-part="m"]').value), d = Number(el.querySelector('[data-part="d"]').value);
+  if (!m || !d) return '';
+  if (d > DAYS_IN_MONTH[m - 1]) return null;
+  return `${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+export const days = {
+  render(ctx) {
+    const saved = draftOf(ctx.data.days || []);
+    if (ctx.entering || !daysDraft) daysDraft = saved;
+    const list = daysDraft.anniversaries;
+    return `<div class="page days-page">${backBar('誕生日と記念日', '#/menu')}
+      <p class="lead">その日は、ホームに決まった挨拶が出ます${info(DAYS_INFO)}</p>
+      <div class="menu-group-label">誕生日</div>
+      <div class="list card"><div class="row"><span class="t"><b>誕生日</b></span>${mdPicker('birthday', daysDraft.birthday, true)}</div></div>
+      <div class="menu-group-label">記念日</div>
+      <div class="list card">
+        ${list.map((a, i) => `<div class="row"><span class="t"><b>${esc(a.name)}</b><small>${mdText(a.md)}</small></span>
+          <button class="btn small ghost" data-del="${i}" aria-label="${esc(a.name)}を消す">消す</button></div>`).join('')}
+        <div class="row-edit add-day">
+          <label class="field"><span>名前（${ANNIVERSARY_NAME_MAX}文字まで）</span>
+            <input id="day-name" maxlength="${ANNIVERSARY_NAME_MAX}" autocomplete="off" placeholder="例：結婚記念日"></label>
+          <div class="add-day-row">${mdPicker('new', '', true)}<button class="btn small" data-act="add-day">${icon('plus')}足す</button></div>
+        </div>
+      </div>
+      <button class="btn primary wide" data-act="save-days"${sameDraft(daysDraft, saved) ? ' disabled' : ''}>保存</button>
+    </div>`;
+  },
+  mount(root, ctx) {
+    const saveBtn = root.querySelector('[data-act="save-days"]');
+    const touch = () => { saveBtn.disabled = sameDraft(daysDraft, draftOf(ctx.data.days || [])); };
+    root.querySelector('[data-md="birthday"]').addEventListener('change', e => {
+      const md = readPicker(e.currentTarget);
+      if (md === null) { toast('その日はありません', 'warn'); return; }
+      daysDraft.birthday = md;
+      touch();
+    });
+    root.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+      daysDraft.anniversaries.splice(Number(b.dataset.del), 1);
+      ctx.rerender();
+    }));
+    const add = () => {
+      const name = root.querySelector('#day-name').value.trim();
+      const md = readPicker(root.querySelector('[data-md="new"]'));
+      if (!name) { toast('名前を入れてください', 'warn'); return; }
+      if (/^[=+\-@]/.test(name)) { toast('名前を = + - @ で始めることはできません', 'warn'); return; }
+      if (!md) { toast(md === null ? 'その日はありません' : '月と日を選んでください', 'warn'); return; }
+      if (daysDraft.anniversaries.length >= 30) { toast('記念日は30件までです', 'warn'); return; }
+      daysDraft.anniversaries.push({ name, md });
+      daysDraft.anniversaries.sort((a, b) => (a.md < b.md ? -1 : a.md > b.md ? 1 : 0));
+      ctx.rerender();
+    };
+    root.querySelector('[data-act="add-day"]').addEventListener('click', add);
+    root.querySelector('#day-name').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+    saveBtn.addEventListener('click', () => {
+      const birthdayEl = root.querySelector('[data-md="birthday"]');
+      if (readPicker(birthdayEl) === null) { toast('誕生日に、ない日が選ばれています', 'warn'); return; }
+      const value = JSON.parse(JSON.stringify(daysDraft));
+      const next = [...(value.birthday ? [{ kind: '誕生日', name: '誕生日', md: value.birthday }] : []),
+        ...value.anniversaries.map(a => ({ kind: '記念日', name: a.name, md: a.md }))];
+      ctx.saveSoon(data => { data.days = next.map(d => ({ ...d })); }, () => api.setDays(value.birthday, value.anniversaries), '誕生日と記念日を保存しました');
     });
   },
 };

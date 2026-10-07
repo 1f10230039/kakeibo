@@ -158,3 +158,12 @@ export const importCsv = (add, cancel) => call('importCsv', { add, cancel });
 export const setBudget = (month, amount) => call('setBudget', { month, amount });
 /** 資産の記録。金額は整数か null（その項目は記録しない／やめる）。3つとも null ならその日の記録をやめる。 */
 export const setAssetRecord = (date, bank, nisa, nisaPrincipal) => call('setAssetRecord', { date, bank, nisa, nisaPrincipal });
+/** 誕生日と記念日をまとめて入れ替える（10/7）。birthday：'MM-DD' か ''、anniversaries：[{ name, md }] */
+export async function setDays(birthday, anniversaries) {
+  try {
+    return await call('setDays', { birthday, anniversaries });
+  } catch (e) {
+    if (e instanceof UserError && e.message === '知らない action です') throw new UserError('GAS ② がまだ古いままです（貼り直して、新しいバージョンでデプロイしてください）');
+    throw e;
+  }
+}

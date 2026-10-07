@@ -18,11 +18,11 @@ const ROUTES = {
   home, stats,
   budget,
   assets, income, fixed, csv: csvimport,
-  menu: pages.menu, rules: pages.rules, unclassified: pages.unclassified, stale: pages.stale, key: pages.key,
+  menu: pages.menu, rules: pages.rules, days: pages.days, unclassified: pages.unclassified, stale: pages.stale, key: pages.key,
 };
 const TABS = [['home', 'ホーム'], ['stats', '統計'], ['budget', '予算'], ['assets', '資産']];
 // 画面の深さ。深いほうへ進むときは右から、戻るときは左から入ってくる。同じ深さ（タブどうし）は下からふわっと
-const DEPTH = { menu: 1, unclassified: 1, stale: 1, income: 1, fixed: 1, rules: 2, csv: 2 };
+const DEPTH = { menu: 1, unclassified: 1, stale: 1, income: 1, fixed: 1, rules: 2, days: 2, csv: 2 };
 // 画面に入ったとき、上から順に少しずつ遅らせて出す部分
 const RISE = '.spend, .income-main, .fixed-main, .fixed-chart, .fixed-mini, .csv-summary, .budget-main, .budget-empty, .asset-main, .asset-chart, .asset-spend, .asset-empty, .pair, .due, .todo, .home-side > *, .page-head, .controls, .period, .chart, .tx-list > *, .lead, .menu-group-label, .list, .progress, .sort-card, .switch-row, .field, .picker-group, .btn.wide, .note, .credit, .empty';
 
@@ -48,7 +48,7 @@ function route() {
 function context(entering = false) {
   const today = new Date();
   return {
-    data: state.data, fetchedAt: state.fetchedAt, hidden: state.hidden, today, look: lookOf(today), entering,
+    data: state.data, fetchedAt: state.fetchedAt, hidden: state.hidden, today, look: lookOf(today, state.data?.days), entering,
     rerender: render,
     refresh,
     write,
@@ -247,7 +247,7 @@ render();
 if (api.hasCredentials()) refresh();
 
 // 時間帯が変わったら（開きっぱなしでも）写真と色を変える
-setInterval(() => applyLook(lookOf(new Date())), 60 * 1000);
+setInterval(() => applyLook(lookOf(new Date(), state.data?.days)), 60 * 1000);
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => { /* なくても動く */ });

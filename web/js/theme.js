@@ -4,6 +4,7 @@
 // 色：朝・夕方＝A（アイボリー×紺）、昼＝B（白×緑）、夜＝C（紺×金）
 
 import { isHoliday } from './calc.js';
+import { specialDay } from './days.js';
 
 export function seasonOf(month) {
   if (month === 12 || month <= 2) return 'winter';
@@ -22,8 +23,8 @@ export function slotOf(hour) {
 // ---- 挨拶（10/7 本人：バリエーションを増やしたい） ----
 // 時間帯ごとの候補から1つ選ぶ。挨拶の時間帯は写真より細かい（夜のうち 23〜5時は「深夜」）。
 // 同じ日の同じ時間帯なら、何度開いても同じ挨拶（開くたびに変わると落ち着かないので）。日が変わると、候補の次のものになる。
-// 0〜5時は前の日の夜の続きとして数える（金曜の深夜は、まだ金曜の夜）。元日〜1/3・大晦日・月の1日は決まった挨拶。
-// 写真の上に1行で収まるように、どれも12文字まで（テストで確かめる）。
+// 0〜5時は前の日の夜の続きとして数える（金曜の深夜は、まだ金曜の夜）。特別な日（誕生日・行事・祝日・月の1日など。days.js）は決まった挨拶。
+// 写真の上に1行で収まるように、ふだんの挨拶は12文字まで、特別な日は14文字まで（テストで確かめる）。
 
 export const GREETINGS = {
   morning: ['おはようございます', '今日もいい一日を', '朝ごはん、食べましたか？', '今日もがんばりましょう'],
@@ -58,18 +59,10 @@ function addDay(d, n) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 }
 
-function greetSlot(hour) {
+/** 挨拶の時間帯：写真の時間帯（slotOf）の夜のうち、23〜5時を 'late'（深夜）にしたもの。 */
+export function greetSlot(hour) {
   const slot = slotOf(hour);
   return slot === 'night' && (hour >= 23 || hour < 5) ? 'late' : slot;
-}
-
-/** 決まった日の挨拶（その日の日付そのもので見る）。なければ null。 */
-function specialGreeting(now, slot) {
-  const m = now.getMonth() + 1, day = now.getDate();
-  if (m === 1 && day <= 3) return '新年おめでとうございます';
-  if (m === 12 && day === 31) return slot === 'night' || slot === 'late' ? '今年もおつかれさまでした' : 'よいお年を';
-  if (day === 1 && (slot === 'morning' || slot === 'day')) return '新しい月のはじまりです';
-  return null;
 }
 
 /** 数える日：0〜5時は前の日。 */
@@ -77,19 +70,19 @@ function countDay(now) {
   return addDay(now, now.getHours() < 5 ? -1 : 0);
 }
 
-/** その日・その時間帯に出しうる挨拶（決まった日の挨拶があれば、それだけ）。 */
-export function greetingCandidates(now) {
+/** その日・その時間帯に出しうる挨拶（特別な日（days.js）なら、その挨拶だけ）。days はシートの「記念日」。 */
+export function greetingCandidates(now, days = []) {
   const h = now.getHours();
   const slot = greetSlot(h);
-  const special = specialGreeting(now, slot);
-  if (special) return [special];
+  const special = specialDay(now, slot, days);
+  if (special) return [special.text];
   const d = countDay(now);
   return [...GREETINGS[slot], ...EXTRA_GREETINGS.filter(g => g.when(d, h, slot)).map(g => g.text)];
 }
 
 /** いまの挨拶。候補を、数える日の通し番号で順に回す（候補が同じなら、次の日には必ず別のものになる）。 */
-export function greetingOf(now) {
-  const list = greetingCandidates(now);
+export function greetingOf(now, days = []) {
+  const list = greetingCandidates(now, days);
   const d = countDay(now);
   const dayNo = Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
   return list[dayNo % list.length];
@@ -97,14 +90,35 @@ export function greetingOf(now) {
 
 const THEME_BY_SLOT = { morning: 'a', day: 'b', evening: 'a', night: 'c' };
 
-/** いまの見た目。写真の上の文字は16枚とも白（上をうっすら暗くして読みやすくする）。 */
-export function lookOf(now) {
+// ---- 写真（10/7 本人：月ごとに変える＋行事の日は専用の写真） ----
+// 1. 特別な日に写真があれば event-◯◯.webp（時間帯は共通）
+// 2. 月と時間帯の写真 m01-morning.webp 〜 m12-night.webp
+// 3. なければ、季節と時間帯の写真（10/6 の16枚）
+// あるファイルだけをここに並べる（写真を足したらここにも足す。テストでフォルダの中身と同じか確かめる）
+export const HERO_FILES = new Set([
+  ...['spring', 'summer', 'autumn', 'winter'].flatMap(s => ['morning', 'day', 'evening', 'night'].map(t => `${s}-${t}.webp`)),
+]);
+
+export function heroOf(now, special, files = HERO_FILES) {
+  const slot = slotOf(now.getHours());
+  const candidates = [
+    special?.photo && `event-${special.photo}.webp`,
+    `m${String(now.getMonth() + 1).padStart(2, '0')}-${slot}.webp`,
+    `${seasonOf(now.getMonth() + 1)}-${slot}.webp`,
+  ];
+  return `images/hero/${candidates.find(f => f && files.has(f))}`;
+}
+
+/** いまの見た目。写真の上の文字はどれも白（上をうっすら暗くして読みやすくする）。days はシートの「記念日」。 */
+export function lookOf(now, days = []) {
   const season = seasonOf(now.getMonth() + 1);
   const slot = slotOf(now.getHours());
+  const special = specialDay(now, greetSlot(now.getHours()), days);
   return {
     season, slot,
     theme: THEME_BY_SLOT[slot],
-    hero: `images/hero/${season}-${slot}.webp`,
-    greeting: greetingOf(now),
+    hero: heroOf(now, special),
+    greeting: greetingOf(now, days),
+    special: special?.key || null,
   };
 }

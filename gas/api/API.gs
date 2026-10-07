@@ -17,6 +17,8 @@ const MIN_KEY_LENGTH = 32;
 const WRITABLE_SETTINGS = { '週の始まり': ['月', '日'] };
 const ASSET_ITEMS = { bank: '楽天銀行', nisa: '楽天証券 NISA' }; // 資産の項目（10/6 本人「この2つ」）
 const MAX_ASSET = 1000000000;
+const MAX_ANNIVERSARIES = 30;
+const ANNIVERSARY_NAME_MAX = 8; // ホームの挨拶「今日は◯◯ですね」が14文字に収まるように（web/js/days.js と同じ）
 
 /** 呼んだ人に見せてよい失敗（合言葉が正しいときだけ返る）。 */
 class UserError extends Error {}
@@ -62,15 +64,27 @@ function gasDeps() {
   };
 }
 
-/** シートの読み書き。スプレッドシートは、合言葉が通ってから初めて開く。 */
+/**
+ * シートの読み書き。スプレッドシートは、合言葉が通ってから初めて開く。
+ * あとから足したシート（記念日・10/7）は、まだなければ読むときは空、初めて書くときに作る（GAS ① の setup を動かし直さなくてよいように）。
+ */
 function sheetStore(openSpreadsheet) {
   let ss;
-  const sheet = name => (ss = ss || openSpreadsheet()).getSheetByName(name);
+  const open = () => (ss = ss || openSpreadsheet());
+  const sheet = name => open().getSheetByName(name);
   return {
-    rows: name => readTable(sheet(name)),
+    rows: name => { const sh = sheet(name); return sh ? readTable(sh) : []; },
     update: (name, row) => writeRows(sheet(name), row._row, [row]),
-    append: (name, rows) => appendRows(sheet(name), rows),
+    append: (name, rows) => appendRows(sheet(name) || createSheet(open(), name), rows),
   };
+}
+
+function createSheet(ss, name) {
+  const sh = ss.insertSheet(name);
+  const header = HEADERS[name];
+  sh.getRange(1, 1, 1, header.length).setValues([header]).setFontWeight('bold');
+  sh.setFrozenRows(1);
+  return sh;
 }
 
 // ---- 合言葉 ----
@@ -149,6 +163,10 @@ const ACTIONS = {
         lastIngest: settings['最終取り込み'] || '',
         unreadableMails: String(settings['読めなかったメール'] || '').split(',').filter(Boolean).length,
       },
+      // 誕生日と記念日（10/7）。シートで手で直した行も読めるように、月日は「3/15」「2026-03-15」の形も受け取る。読めない行は出さない
+      days: store.rows(SHEET.DAYS)
+        .map(r => ({ kind: r['種類'], name: String(r['名前'] || '').trim(), md: toMonthDay(r['月日']) }))
+        .filter(d => d.md && (d.kind === '誕生日' || (d.kind === '記念日' && d.name))),
     };
   },
 
@@ -380,6 +398,33 @@ const ACTIONS = {
     else store.append(SHEET.SETTINGS, [{ '項目': key, '値': value }]);
     return { key, value };
   },
+
+  /**
+   * 誕生日と記念日を、まとめて入れ替える（10/7。ホームの挨拶と写真に使う）。
+   * birthday：'MM-DD'（'' ならなし）。anniversaries：[{ name（8文字まで）, md: 'MM-DD' }]（30件まで）。
+   * 前の行は上から書き直し、余った行は空にする（空の行は読まない。シートの行を消す手続きはないので）。
+   */
+  setDays({ birthday, anniversaries }, { store }) {
+    if (birthday !== '') checkMonthDay(birthday, 'birthday');
+    if (!Array.isArray(anniversaries) || anniversaries.length > MAX_ANNIVERSARIES) throw new UserError(`記念日は ${MAX_ANNIVERSARIES} 件までです`);
+    anniversaries.forEach(a => {
+      if (!a || typeof a !== 'object') throw new UserError('記念日の形がおかしいです');
+      checkText(a.name, '記念日の名前', ANNIVERSARY_NAME_MAX, false);
+      checkMonthDay(a.md, '記念日の日付');
+    });
+    const want = [
+      ...(birthday ? [{ '種類': '誕生日', '名前': '誕生日', '月日': birthday }] : []),
+      ...anniversaries.map(a => ({ '種類': '記念日', '名前': a.name.trim(), '月日': a.md })),
+    ];
+    const rows = store.rows(SHEET.DAYS);
+    const blank = { '種類': '', '名前': '', '月日': '' };
+    rows.forEach((row, i) => {
+      const next = want[i] || blank;
+      if (Object.keys(next).some(k => String(row[k]) !== next[k])) store.update(SHEET.DAYS, Object.assign(row, next));
+    });
+    if (want.length > rows.length) store.append(SHEET.DAYS, want.slice(rows.length));
+    return { birthday, anniversaries: anniversaries.map(a => ({ name: a.name.trim(), md: a.md })) };
+  },
 };
 
 // ---- 小さな道具 ----
@@ -414,6 +459,21 @@ function checkDate(v) {
   const m = typeof v === 'string' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
   const d = m && new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
   if (!d || d.getUTCMonth() !== +m[2] - 1 || d.getUTCDate() !== +m[3]) throw new UserError('date は YYYY-MM-DD にしてください');
+}
+
+/** 'MM-DD'（年なし）か。2/29 はよい（誕生日がうるう日の人がいる）。 */
+function checkMonthDay(v, name) {
+  const m = typeof v === 'string' && /^(\d{2})-(\d{2})$/.exec(v);
+  const days = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (!m || +m[1] < 1 || +m[1] > 12 || +m[2] < 1 || +m[2] > days[+m[1] - 1]) throw new UserError(`${name} は MM-DD にしてください`);
+}
+
+/** シートの月日を 'MM-DD' に。「3/15」「03-15」「2026-03-15」を受け取る。読めなければ ''。 */
+function toMonthDay(v) {
+  const m = /^(?:\d{4}[-/])?(\d{1,2})[-/](\d{1,2})$/.exec(String(v || '').trim());
+  if (!m) return '';
+  const md = `${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
+  try { checkMonthDay(md, ''); return md; } catch (_) { return ''; }
 }
 
 /** 文字の長さと、表計算の式として読まれる書き出し（= + - @）を断る。 */

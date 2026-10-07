@@ -90,6 +90,7 @@ const DB = {
   budgets: [{ month: '', target: '全体', amount: 50000 }],
   assets: [...assetRows(3, 182000, 61200, 60000), ...assetRows(2, 176500, 70300, 70000), ...assetRows(1, 190300, 81900, 80000)],
   settings: { weekStart: '月', lastIngest: `${d(0)} 06:12`, unreadableMails: 0 },
+  days: [{ kind: '誕生日', name: '誕生日', md: '03-15' }, { kind: '記念日', name: 'はじめた日', md: '10-06' }], // 見本（本物の誕生日ではない）
 };
 
 const norm = s => String(s || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toUpperCase();
@@ -106,7 +107,7 @@ export function mockData() {
 export async function mockCall(action, p) {
   await wait();
   if (MODE === 'fail' && action !== 'getData') throw new Error('mock：わざと失敗させました');
-  if (MODE === 'old' && action === 'saveDetail') throw new UserError('知らない action です');
+  if (MODE === 'old' && (action === 'saveDetail' || action === 'setDays')) throw new UserError('知らない action です');
   return run(action, p);
 }
 
@@ -157,6 +158,9 @@ function run(action, p) {
     case 'setMemo': find(p.id).memo = p.memo; return { id: p.id };
     case 'deleteManual': case 'resolveSokuho': find(p.id).status = '取消'; return { id: p.id };
     case 'setSetting': DB.settings.weekStart = p.value; return p;
+    case 'setDays':
+      DB.days = [...(p.birthday ? [{ kind: '誕生日', name: '誕生日', md: p.birthday }] : []), ...p.anniversaries.map(a => ({ kind: '記念日', name: a.name, md: a.md }))];
+      return p;
     case 'setAssetRecord': {
       const put = (item, amount, principal) => {
         DB.assets = DB.assets.filter(a => !(a.date === p.date && a.item === item));

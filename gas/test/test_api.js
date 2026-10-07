@@ -24,7 +24,8 @@ function memoryStore(tables) {
   Object.values(t).forEach(rows => rows.forEach((r, i) => { r._row = i + 2; }));
   return {
     tables: t,
-    rows: name => JSON.parse(JSON.stringify(t[name] || [])),
+    // 本物の readTable と同じく、全部の欄が空の行は読まない
+    rows: name => JSON.parse(JSON.stringify((t[name] || []).filter(r => Object.keys(r).some(k => k !== '_row' && r[k] !== '' && r[k] !== undefined)))),
     update: (name, row) => { t[name][row._row - 2] = JSON.parse(JSON.stringify(row)); },
     append: (name, rows) => rows.forEach(r => { t[name] = t[name] || []; t[name].push({ ...r, _row: t[name].length + 2 }); }),
   };
@@ -222,7 +223,7 @@ test('fresh：書き込みの返事に、書いたあとの getData を入れる
   const res = call({ key: KEY, action: 'setMemo', params: { id: 'm_K1_1', memo: 'あたらしい' }, fresh });
   assert.deepStrictEqual(res.data, { id: 'm_K1_1' });
   assert.strictEqual(res.fresh.transactions.find(t => t.id === 'm_K1_1').memo, 'あたらしい');
-  assert.deepStrictEqual(Object.keys(res.fresh).sort(), ['assets', 'budgets', 'categories', 'rules', 'settings', 'transactions']);
+  assert.deepStrictEqual(Object.keys(res.fresh).sort(), ['assets', 'budgets', 'categories', 'days', 'rules', 'settings', 'transactions']);
   assert.strictEqual('fresh' in call({ key: KEY, action: 'getData', params: fresh, fresh }), false);
   const bad = call({ key: KEY, action: 'setMemo', params: { id: 'm_K1_1', memo: 'つぎ' }, fresh: { from: 'x', to: 'y' } });
   assert.deepStrictEqual([bad.ok, 'fresh' in bad], [true, false]);
@@ -414,6 +415,61 @@ test('setAssetRecord：日付・金額の形が違えば断る。元本だけは
     assert.strictEqual(call({ key: KEY, action: 'setAssetRecord', params }).ok, false, JSON.stringify(bad));
   }
   assert.strictEqual(store.tables['資産'].length, 0);
+});
+
+// ---- 誕生日と記念日（10/7） ----
+const daysOf = call => call({ key: KEY, action: 'getData', params: { from: '2026-09', to: '2026-10' } }).data.days;
+const setDays = (call, birthday, anniversaries) => call({ key: KEY, action: 'setDays', params: { birthday, anniversaries } });
+
+test('setDays：シートがなくても getData は空で返し、初めて書くときにシートを作る。誕生日と記念日を getData で返す', () => {
+  const { call, store } = setup();
+  assert.deepStrictEqual(daysOf(call), []);
+  assert.strictEqual(store.tables['記念日'], undefined);
+  assert.strictEqual(setDays(call, '03-15', [{ name: '内定式', md: '10-01' }, { name: ' 記念日 ', md: '02-29' }]).ok, true);
+  assert.deepStrictEqual(daysOf(call), [
+    { kind: '誕生日', name: '誕生日', md: '03-15' }, { kind: '記念日', name: '内定式', md: '10-01' }, { kind: '記念日', name: '記念日', md: '02-29' }]);
+});
+
+test('setDays：入れ替え。減った分の行は空にして読まない。同じなら書かない', () => {
+  const { call, store } = setup();
+  setDays(call, '03-15', [{ name: 'A', md: '01-02' }, { name: 'B', md: '01-03' }]);
+  let writes = 0;
+  const update = store.update;
+  store.update = (n, r) => { writes++; update(n, r); };
+  assert.strictEqual(setDays(call, '03-15', [{ name: 'A', md: '01-02' }, { name: 'B', md: '01-03' }]).ok, true);
+  assert.strictEqual(writes, 0, '同じなら書かない');
+  assert.strictEqual(setDays(call, '', [{ name: 'B', md: '01-03' }]).ok, true);
+  assert.deepStrictEqual(daysOf(call), [{ kind: '記念日', name: 'B', md: '01-03' }]);
+  assert.strictEqual(store.tables['記念日'].length, 3, '行は消さずに空にする');
+  assert.strictEqual(setDays(call, '12-01', [{ name: 'C', md: '05-05' }, { name: 'D', md: '06-06' }, { name: 'E', md: '07-07' }]).ok, true);
+  assert.deepStrictEqual(daysOf(call).map(d => d.name), ['誕生日', 'C', 'D', 'E']);
+  // 空の行は読まないので使い回さず、下に足す（シートに空の行が残るだけで、読むものは正しい）
+  assert.strictEqual(store.tables['記念日'].length, 6);
+});
+
+test('setDays：形が違えば何も書かない（日付・名前の長さ・式の書き出し・件数・誕生日なし）', () => {
+  const bad = [
+    ['3-15', []], ['13-01', []], ['02-30', []], ['04-31', []], [undefined, []], ['03-15', null],
+    ['', [{ name: '', md: '01-01' }]], ['', [{ name: '123456789', md: '01-01' }]], ['', [{ name: '=A1', md: '01-01' }]],
+    ['', [{ name: 'A', md: '2026-01-01' }]], ['', [null]], ['', Array.from({ length: 31 }, () => ({ name: 'A', md: '01-01' }))],
+  ];
+  for (const [b, a] of bad) {
+    const { call, store } = setup();
+    assert.strictEqual(setDays(call, b, a).ok, false, JSON.stringify([b, a]));
+    assert.strictEqual(store.tables['記念日'], undefined, JSON.stringify([b, a]));
+  }
+  const { call } = setup();
+  assert.strictEqual(setDays(call, '', [{ name: '12345678', md: '12-31' }]).ok, true, '8文字までよい');
+});
+
+test('getData：シートで手で直した記念日も読む（3/15・2026-03-15）。読めない行・種類の違う行は出さない', () => {
+  const tables = baseTables();
+  tables['記念日'] = [
+    { '種類': '誕生日', '名前': '誕生日', '月日': '3/5' }, { '種類': '記念日', '名前': 'X', '月日': '2026-12-24' },
+    { '種類': '記念日', '名前': '', '月日': '01-01' }, { '種類': 'ほか', '名前': 'Y', '月日': '01-01' }, { '種類': '記念日', '名前': 'Z', '月日': '2/30' },
+  ];
+  const { call } = setup(memoryStore(tables));
+  assert.deepStrictEqual(daysOf(call), [{ kind: '誕生日', name: '誕生日', md: '03-05' }, { kind: '記念日', name: 'X', md: '12-24' }]);
 });
 
 // ---- 中の失敗 ----

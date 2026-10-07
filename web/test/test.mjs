@@ -1,9 +1,10 @@
-// 集計の計算（js/calc.js）と、季節・時間帯の決まり（js/theme.js）を Node.js で確かめる。
+// 集計の計算（js/calc.js）と、季節・時間帯・特別な日の決まり（js/theme.js・js/days.js）を Node.js で確かめる。
 // 実行：node web/test/test.mjs
 
 import assert from 'node:assert';
 import * as C from '../js/calc.js';
 import * as T from '../js/theme.js';
+import * as S from '../js/days.js';
 import * as V from '../js/csv.js';
 import fs from 'node:fs';
 
@@ -349,15 +350,15 @@ test('挨拶：曜日・休日・季節で候補が増える', () => {
   const has = (d, s) => T.greetingCandidates(d).includes(s);
   assert.ok(has(new Date(2026, 9, 5, 7), '今週もはじまりましたね'), '月曜の朝');
   assert.ok(!has(new Date(2026, 9, 12, 7), '今週もはじまりましたね'), 'スポーツの日（月曜の祝日）は出さない');
-  assert.ok(has(new Date(2026, 9, 12, 7), 'よい休日を') && !has(new Date(2026, 9, 7, 7), 'よい休日を'), '祝日の朝だけ');
+  assert.ok(has(new Date(2026, 9, 10, 7), 'よい休日を') && !has(new Date(2026, 9, 7, 7), 'よい休日を'), '土曜の朝だけ（祝日は祝日の挨拶）');
   assert.ok(has(new Date(2026, 9, 9, 20), 'よい週末を') && has(new Date(2026, 9, 9, 17), '今週もおつかれさまでした'), '金曜の夕方・夜');
   assert.ok(!has(new Date(2026, 9, 8, 20), 'よい週末を'), '木曜の夜は出さない');
   assert.ok(has(new Date(2026, 9, 10, 1), 'そろそろ休みませんか') && !has(new Date(2026, 9, 10, 1), 'よい週末を'), '金曜の深夜は深夜の候補');
   assert.ok(!has(new Date(2026, 9, 11, 20), '明日から平日ですね'), '日曜でも次の日が祝日なら出さない');
-  assert.ok(has(new Date(2026, 9, 12, 20), '明日から平日ですね'), '連休の最後の夜');
+  assert.ok(has(new Date(2026, 9, 18, 20), '明日から平日ですね'), '休みの最後の夜');
   assert.ok(has(new Date(2026, 9, 7, 12), 'お昼、食べましたか？') && !has(new Date(2026, 9, 7, 15), 'お昼、食べましたか？'), 'お昼どき');
   assert.ok(has(new Date(2026, 9, 7, 21), '秋の夜長ですね') && !has(new Date(2026, 6, 7, 21), '秋の夜長ですね'), '秋の夜');
-  assert.ok(has(new Date(2026, 0, 20, 7), '暖かくしてくださいね') && has(new Date(2026, 6, 20, 12), '水分とってくださいね'), '冬の朝・夏の昼');
+  assert.ok(has(new Date(2026, 0, 20, 7), '暖かくしてくださいね') && has(new Date(2026, 6, 21, 12), '水分とってくださいね'), '冬の朝・夏の昼（7/20 は海の日なので 7/21）');
 });
 
 test('挨拶：元日〜1/3・大晦日・月の1日は決まった挨拶', () => {
@@ -369,10 +370,86 @@ test('挨拶：元日〜1/3・大晦日・月の1日は決まった挨拶', () =
   assert.ok(T.greetingCandidates(new Date(2026, 10, 1, 20)).length > 1, '1日の夜はふだんの挨拶');
 });
 
-test('挨拶はどれも12文字まで（写真の上に1行で収まる）', () => {
-  const all = [...Object.values(T.GREETINGS).flat(), ...T.EXTRA_GREETINGS.map(g => g.text),
-    '新年おめでとうございます', 'よいお年を', '今年もおつかれさまでした', '新しい月のはじまりです'];
-  all.forEach(s => assert.ok([...s].length <= 12, `${s}（${[...s].length}文字）`));
+test('挨拶の長さ：ふだんは12文字まで、特別な日は14文字まで（写真の上に 21px で1行）', () => {
+  [...Object.values(T.GREETINGS).flat(), ...T.EXTRA_GREETINGS.map(g => g.text)]
+    .forEach(s => assert.ok([...s].length <= 12, `${s}（${[...s].length}文字）`));
+  const special = [S.BIRTHDAY_TEXT, S.anniversaryText('あ'.repeat(S.ANNIVERSARY_NAME_MAX)), '新しい月のはじまりです',
+    ...S.EVENTS.flatMap(e => ['morning', 'day', 'evening', 'night', 'late'].map(s => e.text(s)))];
+  for (let d = new Date(2026, 0, 1); d.getFullYear() <= 2030; d.setDate(d.getDate() + 1)) {
+    const name = C.holidayName(d);
+    if (name) special.push(`今日は${name}ですね`);
+  }
+  special.forEach(s => assert.ok([...s].length <= 14, `${s}（${[...s].length}文字）`));
+});
+
+// ---- 特別な日（days.js・10/7） ----
+const sp = (y, m, d, h = 12, days = []) => S.specialDay(new Date(y, m - 1, d, h), T.greetSlot(h), days);
+const spKey = (...a) => sp(...a)?.key || null;
+
+test('特別な日：年で変わる行事（節分＝立春の前の日・冬至・十五夜。国立天文台の値）と、第n日曜の母の日・父の日', () => {
+  assert.strictEqual(spKey(2026, 2, 3), 'setsubun');   // 2026 立春 2/4（暦要項）
+  assert.strictEqual(spKey(2027, 2, 3), 'setsubun');   // 2027 立春 2/4（暦要項）
+  assert.strictEqual(spKey(2029, 2, 2), 'setsubun');   // 2029 立春 2/3
+  assert.strictEqual(spKey(2029, 2, 3), null);
+  assert.strictEqual(spKey(2026, 12, 22), 'toji');     // 2026 冬至 12/22（暦要項）
+  assert.strictEqual(spKey(2028, 12, 21), 'toji');
+  assert.strictEqual(spKey(2026, 12, 21), null);
+  assert.strictEqual(spKey(2026, 9, 25), 'jugoya');    // 国立天文台「中秋の名月とは」
+  assert.strictEqual(spKey(2027, 9, 15), 'jugoya');
+  assert.strictEqual(spKey(2051, 9, 30), null, '表の先の年は出さない');
+  assert.strictEqual(spKey(2060, 2, 3), null, '表の先の年は出さない');
+  assert.strictEqual(spKey(2026, 5, 10), 'mothers');   // 5月の第2日曜
+  assert.strictEqual(spKey(2027, 5, 9), 'mothers');
+  assert.strictEqual(spKey(2026, 6, 21), 'fathers');   // 6月の第3日曜
+  assert.strictEqual(spKey(2026, 6, 14), null);
+});
+
+test('特別な日：日付の決まった行事・イベント', () => {
+  const want = [[1, 2, 'newyear'], [2, 14, 'valentine'], [3, 3, 'hinamatsuri'], [3, 14, 'whiteday'], [4, 1, 'aprilfool'], [5, 5, 'kodomo'],
+    [7, 7, 'tanabata'], [8, 13, 'obon'], [8, 16, 'obon'], [10, 31, 'halloween'], [12, 24, 'christmas-eve'], [12, 25, 'christmas'], [12, 31, 'omisoka']];
+  want.forEach(([m, d, key]) => assert.strictEqual(spKey(2026, m, d), key, `${m}/${d}`));
+  assert.strictEqual(spKey(2026, 8, 17), null);
+  assert.strictEqual(sp(2026, 7, 7, 12).text, '今日は七夕ですね');
+  assert.strictEqual(sp(2026, 7, 7, 23).text, '願いごと、しましたか？');
+  assert.strictEqual(spKey(2026, 7, 8, 1), null, '0〜5時は、その日の日付で見る（七夕の次の日の夜中は、ふだんの挨拶）');
+  assert.strictEqual(sp(2026, 12, 24, 20).text, 'メリークリスマス');
+});
+
+test('特別な日：祝日は名前の挨拶（振替休日・国民の休日も）', () => {
+  assert.strictEqual(sp(2026, 11, 3).text, '今日は文化の日ですね');
+  assert.strictEqual(sp(2026, 5, 6).text, '今日は振替休日ですね');
+  assert.strictEqual(sp(2026, 9, 22).text, '今日は国民の休日ですね');
+  assert.strictEqual(sp(2026, 9, 21).text, '今日は敬老の日ですね');
+  assert.strictEqual(sp(2026, 5, 5).key, 'kodomo', 'こどもの日は行事のほう（写真つき）');
+});
+
+test('特別な日：誕生日 → 記念日 → 行事 → 祝日 → 月の1日の順。2/29 は、うるう年でない年は 2/28', () => {
+  const days = [{ kind: '誕生日', name: '誕生日', md: '12-25' }, { kind: '記念日', name: '内定式', md: '11-03' }, { kind: '記念日', name: '記念日', md: '04-01' }];
+  assert.deepStrictEqual(sp(2026, 12, 25, 12, days), { key: 'birthday', text: 'お誕生日おめでとうございます', photo: 'birthday' });
+  assert.strictEqual(sp(2026, 11, 3, 12, days).text, '今日は内定式ですね');
+  assert.strictEqual(sp(2026, 4, 1, 12, days).text, '今日は記念日ですね', '記念日はエイプリルフールより先');
+  assert.strictEqual(sp(2026, 11, 1, 8).key, 'month-start');
+  assert.strictEqual(sp(2026, 11, 1, 20), null, '1日は朝と昼だけ');
+  const leap = [{ kind: '誕生日', name: '誕生日', md: '02-29' }];
+  assert.strictEqual(spKey(2027, 2, 28, 12, leap), 'birthday');
+  assert.strictEqual(spKey(2028, 2, 28, 12, leap), null);
+  assert.strictEqual(spKey(2028, 2, 29, 12, leap), 'birthday');
+  assert.strictEqual(T.greetingOf(new Date(2026, 11, 25, 7), days), 'お誕生日おめでとうございます');
+  assert.strictEqual(T.lookOf(new Date(2026, 11, 25, 7), days).special, 'birthday');
+});
+
+test('写真：特別な日の写真 → 月の写真 → 季節の写真（あるファイルだけ）', () => {
+  const files = new Set(['event-tanabata.webp', 'm07-night.webp', 'm07-day.webp', 'summer-night.webp', 'summer-morning.webp']);
+  const at = (h, special) => T.heroOf(new Date(2026, 6, 7, h), special, files);
+  assert.strictEqual(at(21, { photo: 'tanabata' }), 'images/hero/event-tanabata.webp');
+  assert.strictEqual(at(21, { photo: 'none' }), 'images/hero/m07-night.webp');
+  assert.strictEqual(at(21, null), 'images/hero/m07-night.webp');
+  assert.strictEqual(at(7, null), 'images/hero/summer-morning.webp');
+});
+
+test('写真：HERO_FILES と images/hero の中身が同じ', () => {
+  const dir = fs.readdirSync(new URL('../images/hero/', import.meta.url)).filter(f => f.endsWith('.webp')).sort();
+  assert.deepStrictEqual([...T.HERO_FILES].sort(), dir);
 });
 
 test('見た目：秋の夜は C と満月の写真', () => {

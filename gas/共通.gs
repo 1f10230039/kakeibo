@@ -13,6 +13,7 @@ const SHEET = {
   ASSETS: '資産',
   SETTINGS: '設定',
   LOG: '記録',
+  DAYS: '記念日', // 誕生日と記念日（10/7。ホームの挨拶と写真。API が初めて書くときに作る）
 };
 
 const HEADERS = {
@@ -23,6 +24,7 @@ const HEADERS = {
   [SHEET.ASSETS]: ['記録日', '項目', '金額', '元本'], // 元本：NISA の積み立てた額（10/6 追加。右端に足す）
   [SHEET.SETTINGS]: ['項目', '値'],
   [SHEET.LOG]: ['日時', '読んだメール', '足した', '置き換えた', '速報と結びつけた', '読めなかった', 'メモ'],
+  [SHEET.DAYS]: ['種類', '名前', '月日'], // 種類：誕生日／記念日。月日：MM-DD（年はいらない）
 };
 
 // 要件定義 6.1 のカテゴリとグループ（10/6 決定）
@@ -74,7 +76,7 @@ const NUMBER_COLUMNS = ['金額', '元本', '並び順', '読んだメール', '
 // シートが勝手に日付型に変えてしまったときに、元の文字の形に戻すための書式
 const DATE_TEXT_FORMATS = {
   '利用日': 'yyyy-MM-dd', '記録日': 'yyyy-MM-dd', '決めた日': 'yyyy-MM-dd',
-  '支払月': 'yyyy-MM', '月': 'yyyy-MM',
+  '支払月': 'yyyy-MM', '月': 'yyyy-MM', '月日': 'MM-dd',
   '取り込み日時': 'yyyy-MM-dd HH:mm', '日時': 'yyyy-MM-dd HH:mm', '値': 'yyyy-MM-dd HH:mm',
 };
 
