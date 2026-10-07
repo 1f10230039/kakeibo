@@ -75,7 +75,7 @@ export function render(ctx) {
         <span class="num">${hasFixed ? money(fixed.forecast, hidden) : '<span class="muted">—</span>'}</span>${icon('chevron')}
       </div>
 
-      <div class="due"><span>${esc(C.mdw(debit.date))} 引き落とし予定</span><span class="num">${money(debit.amount, hidden)}</span></div>
+      <div class="due"><span>${esc(C.mdw(debit.date))} 引き落とし予定${debit.points && !hidden ? info(`カードの利用 ${C.yen(debit.card)} から、ポイント払い ${C.yen(debit.points)} を引いた額です。`, '引き落とし予定の出し方') : ''}</span><span class="num">${money(debit.amount, hidden)}</span></div>
 
       <div class="todo">
         ${unclassified ? `<a class="chip" href="#/unclassified"><span class="dot"></span>未分類が${unclassified}件</a>` : ''}

@@ -225,6 +225,24 @@ test('残高：楽天銀行の記録から、記録した日より後〜次の�
   assert.strictEqual(C.spendable(txs, [asset('2026-10-27', '楽天証券 NISA', 1)], D(2026, 10, 27)), null);
 });
 
+test('ポイント払い：収入に数え、支出はそのまま。その支払月の引き落とし予定と残高から引く（0円より下にはしない）', () => {
+  const point = (date, amount, extra = {}) => ({ id: 'h_p' + date + amount, type: '収入', date, amount, status: 'ポイント払い', source: '手入力', payMonth: date.slice(0, 7), memo: 'ポイント', category: '', ...extra });
+  const txs = [tx('2026-09-10', 3000, { payMonth: '2026-10' }), tx('2026-09-20', 2000, { payMonth: '2026-10' }), tx('2026-10-05', 5000, { payMonth: '2026-11' }),
+    point('2026-10-15', 1200), point('2026-10-16', 300, { status: '取消' }),
+    point('2026-10-17', 999, { status: '手入力', memo: 'バイト代' })]; // ふつうの収入（支払月が入っていても引かない）
+  const d = C.nextDebit(txs, D(2026, 10, 20));
+  assert.deepStrictEqual([d.payMonth, d.card, d.points, d.amount], ['2026-10', 5000, 1200, 3800], '取消したポイント払いは引かない');
+  assert.strictEqual(C.nextDebit(txs, D(2026, 10, 28)).amount, 5000, '11月払いには10月のポイントを引かない');
+  assert.strictEqual(C.monthIncome(txs, D(2026, 10, 20)), 1200 + 999, 'ポイントも収入に数える');
+  assert.strictEqual(C.monthToDate(txs, D(2026, 10, 20)), 5000, '支出はそのまま');
+  assert.ok(C.isPointPayment(txs[3]) && !C.isPointPayment(txs[4]) && !C.isPointPayment(txs[0]));
+  const s = C.spendable(txs, [asset('2026-10-01', '楽天銀行', 100000)], D(2026, 10, 20));
+  assert.strictEqual(s.amount, 100000 - 3800);
+  const many = [tx('2026-09-10', 1000, { payMonth: '2026-10' }), point('2026-10-15', 5000)];
+  assert.strictEqual(C.nextDebit(many, D(2026, 10, 20)).amount, 0);
+  assert.strictEqual(C.categoryTotals(C.spendBetween(txs, D(2026, 10, 1), D(2026, 10, 31))).some(c => c.name === 'ポイント'), false, '支出の集計には入らない');
+});
+
 test('「資産を記録する」：25日〜月末は今月、1〜7日は先月（記録日は先月末）。前の25日から記録があれば出さない', () => {
   assert.deepStrictEqual(C.assetDue([], D(2026, 10, 25)), { label: '今月の資産を記録する', date: '2026-10-25' });
   assert.deepStrictEqual(C.assetDue([], D(2026, 11, 3)), { label: '先月の資産を記録する', date: '2026-10-31' });

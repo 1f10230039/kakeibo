@@ -4,6 +4,9 @@ import * as C from '../calc.js';
 import * as api from '../api.js';
 import { info, esc, money, iconMark, incomeMark, openSheet, toast, icon, seg, selectSeg, bindAmountInput, amountOf, busy } from '../ui.js';
 
+/** ポイント払いの説明（記録するのシートと詳細の ⓘ）。 */
+const POINT_NOTE = '楽天カードの請求をポイントで払ったとき（楽天カードアプリ・e-NAVI の「ポイントで支払いサービス」。毎月12日〜24日ごろに手続き）に記録します。\n収入に「ポイント」として入り、支出はそのままです。使った日の月の27日の引き落とし予定から、その分を引きます。\nお店や通信料（楽天モバイルなど）で使ったポイントは記録しません。カードには残りだけ請求されるので、支出はもう合っています。';
+
 /** カテゴリをグループごとに並べたボタン。 */
 export function categoryPicker(categories, selected) {
   const groups = [...new Set(categories.map(c => c.group))];
@@ -110,6 +113,7 @@ export function openDetail(ctx, id) {
 
 /** 収入の詳細：名前を変える・手入力なら消す。 */
 function openIncomeDetail(ctx, t) {
+  if (C.isPointPayment(t)) return openPointDetail(ctx, t);
   openSheet(`
     <div class="detail-head">${incomeMark()}<div><div class="detail-cat">${esc(t.memo || '入金')}</div>
       <div class="detail-merchant">${t.merchant ? esc(t.merchant) : t.source === '手入力' ? '手入力' : ''}</div></div>
@@ -144,6 +148,29 @@ function openIncomeDetail(ctx, t) {
   });
 }
 
+/** ポイント払いの詳細：使った日・どの請求から引いたか。名前はいつも「ポイント」なので変えない。消せる。 */
+function openPointDetail(ctx, t) {
+  const [y, m] = t.payMonth.split('-').map(Number);
+  const debit = C.debitDate(y, m - 1); // 27日。休みの日なら次の営業日
+  openSheet(`
+    <div class="detail-head">${incomeMark()}<div><div class="detail-cat">ポイント</div>
+      <div class="detail-merchant">カードの請求に使ったポイント</div></div>
+      <div class="detail-amt pos">+${money(t.amount, ctx.hidden)}</div></div>
+    <dl class="facts">
+      <div><dt>使った日</dt><dd>${esc(C.mdw(C.parseYmd(t.date)))}</dd></div>
+      <div><dt>種類</dt><dd>ポイント払い${info(POINT_NOTE)}</dd></div>
+      <div><dt>引いた請求</dt><dd>${esc(C.mdw(debit))}の引き落とし</dd></div>
+    </dl>
+    <div class="sheet-actions"><button class="btn danger" data-act="delete">この記録を消す</button></div>
+  `, (sheet, close) => {
+    sheet.querySelector('[data-act="delete"]').addEventListener('click', async e => {
+      if (!confirm('このポイント払いの記録を消しますか？')) return;
+      const restore = busy(e.currentTarget, '消しています…');
+      if (await ctx.write(api.deleteManual(t.id), '消しました')) close(); else restore();
+    });
+  });
+}
+
 /** 収入の名前の候補のボタン（押すと名前の欄に入る）。 */
 function nameChips(names, current = '') {
   return `<div class="picker name-chips">${names.map(n => `<button class="pick${n === current ? ' on' : ''}" data-name="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
@@ -165,13 +192,15 @@ export function openManual(ctx, kind = '支出') {
   const TEXT = {
     '支出': { title: '支出を記録する', note: '500円以下の買い物（カードの通知が来ない）や、現金で払ったものを足します。', label: '名前（なくてもよい）', ph: '例：コンビニ', done: ' を記録しました' },
     '収入': { title: '収入を記録する', note: '楽天銀行への入金（バイト代・お小遣いなど）を足します。名前を付けると、一覧で区別できます。', label: '名前（バイト代など）', ph: '例：バイト代', done: ' の収入を記録しました' },
+    // 10/7 本人：カードの請求をポイントで払ったとき。お店や通信料で使ったポイントは記録しない
+    'ポイント': { title: 'ポイント払いを記録する', note: POINT_NOTE, label: '', ph: '', done: ' のポイント払いを記録しました', date: '使った日' },
   };
   openSheet(`
-    <div class="manual-head"><h2 class="sheet-title"><span data-text="title"></span>${info('', '説明を見る')}</h2>${seg('kind', [['支出', '支出'], ['収入', '収入']], kind, '記録の種類')}</div>
+    <div class="manual-head"><h2 class="sheet-title"><span data-text="title"></span>${info('', '説明を見る')}</h2>${seg('kind', [['支出', '支出'], ['収入', '収入'], ['ポイント', 'ポイント払い']], kind, '記録の種類')}</div>
     <label class="amount-input"><span>¥</span><input id="amount" inputmode="numeric" pattern="[0-9]*" placeholder="0" autocomplete="off" aria-label="金額"></label>
     <div class="field-row">
-      <label class="field"><span>日付</span><input id="date" type="date" value="${C.ymd(ctx.today)}" max="${C.ymd(ctx.today)}"></label>
-      <label class="field grow"><span data-text="label"></span><input id="memo" data-clear maxlength="100" autocomplete="off"></label>
+      <label class="field"><span data-text="date"></span><input id="date" type="date" value="${C.ymd(ctx.today)}" max="${C.ymd(ctx.today)}"></label>
+      <label class="field grow not-point"><span data-text="label"></span><input id="memo" data-clear maxlength="100" autocomplete="off"></label>
     </div>
     <div class="only-income">${nameChips(C.incomeNames(ctx.data.transactions))}</div>
     <div class="only-spend"><div class="sheet-label">カテゴリ（あとで決めてもよい）</div>
@@ -182,7 +211,7 @@ export function openManual(ctx, kind = '支出') {
     const memoEl = sheet.querySelector('#memo');
     const apply = () => {
       sheet.dataset.kind = kind;
-      sheet.querySelectorAll('[data-text]').forEach(el => { el.textContent = TEXT[kind][el.dataset.text]; });
+      sheet.querySelectorAll('[data-text]').forEach(el => { el.textContent = TEXT[kind][el.dataset.text] ?? (el.dataset.text === 'date' ? '日付' : ''); });
       sheet.querySelector('.manual-head [data-info]').dataset.info = TEXT[kind].note; // ⓘ の説明も、支出／収入で変える
       memoEl.placeholder = TEXT[kind].ph;
     };
@@ -206,7 +235,9 @@ export function openManual(ctx, kind = '支出') {
       if (!Number.isInteger(amount) || amount < 1) { toast('金額を入れてください', 'warn'); amountEl.focus(); return; }
       if (/^[=+\-@]/.test(memo)) { toast('名前を = + - @ で始めることはできません', 'warn'); return; }
       const restore = busy(e.currentTarget, '記録しています…');
-      const job = kind === '収入' ? api.addIncome({ date, amount, memo }) : api.addManual({ date, amount, category, memo });
+      const job = kind === '収入' ? api.addIncome({ date, amount, memo })
+        : kind === 'ポイント' ? api.addPointPayment({ date, amount })
+        : api.addManual({ date, amount, category, memo });
       // 失敗したら、入れた金額などを残したまま、もう一度押せるように戻す
       if (await ctx.write(job, `${C.yen(amount)}${TEXT[kind].done}`)) close(); else restore();
     });

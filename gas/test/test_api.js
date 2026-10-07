@@ -381,6 +381,31 @@ test('収入：カテゴリは付けられない。対応表も収入の行に�
   assert.strictEqual(store.tables['取引'].find(r => r.id === 'h_new')['状態'], '取消');
 });
 
+// ---- ポイント払い（10/7） ----
+test('addPointPayment：収入（ポイント）・状態＝ポイント払い・支払月＝使った日の月で足す。getData で返り、消せる', () => {
+  const { call, store } = setup();
+  assert.deepStrictEqual(call({ key: KEY, action: 'addPointPayment', params: { date: '2026-10-15', amount: 1200 } }), { ok: true, data: { id: 'h_new' } });
+  const row = store.tables['取引'].at(-1);
+  assert.deepStrictEqual([row['種類'], row['状態'], row['出どころ'], row['支払月'], row['カテゴリ'], row['メモ'], row['金額'], row['利用日']],
+    ['収入', 'ポイント払い', '手入力', '2026-10', '', 'ポイント', 1200, '2026-10-15']);
+  const t = call({ key: KEY, action: 'getData', params: { from: '2026-10', to: '2026-10' } }).data.transactions.find(x => x.id === 'h_new');
+  assert.deepStrictEqual([t.type, t.status, t.payMonth, t.memo], ['収入', 'ポイント払い', '2026-10', 'ポイント']);
+  assert.strictEqual(call({ key: KEY, action: 'setCategory', params: { id: 'h_new', category: '食費' } }).ok, false, 'カテゴリは付けられない');
+  assert.strictEqual(call({ key: KEY, action: 'deleteManual', params: { id: 'h_new' } }).ok, true);
+  assert.strictEqual(store.tables['取引'].find(r => r.id === 'h_new')['状態'], '取消');
+});
+
+test('addPointPayment：金額・日付の形が違えば何も書かない', () => {
+  const bad = [{ date: '2026-10-15', amount: 0 }, { date: '2026-10-15', amount: 1.5 }, { date: '2026-10-15', amount: '100' }, { date: '2026-10-15', amount: 10000001 },
+    { date: '2026-13-01', amount: 100 }, { date: '2026/10/15', amount: 100 }, { amount: 100 }];
+  for (const params of bad) {
+    const { call, store } = setup();
+    const before = store.tables['取引'].length;
+    assert.strictEqual(call({ key: KEY, action: 'addPointPayment', params }).ok, false, JSON.stringify(params));
+    assert.strictEqual(store.tables['取引'].length, before);
+  }
+});
+
 // ---- 資産 ----
 test('setAssetRecord：楽天銀行と NISA（評価額・元本）を1回で記録する。getData で返る', () => {
   const { call, store } = setup();

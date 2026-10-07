@@ -107,7 +107,7 @@ export function mockData() {
 export async function mockCall(action, p) {
   await wait();
   if (MODE === 'fail' && action !== 'getData') throw new Error('mock：わざと失敗させました');
-  if (MODE === 'old' && (action === 'saveDetail' || action === 'setDays')) throw new UserError('知らない action です');
+  if (MODE === 'old' && ['saveDetail', 'setDays', 'addPointPayment'].includes(action)) throw new UserError('知らない action です');
   return run(action, p);
 }
 
@@ -149,6 +149,11 @@ function run(action, p) {
         payMonth: a.payMonth, status: '確定', category: '', categoryBy: '未分類', source: 'CSV', memo: '' }));
       p.cancel.forEach(id => { find(id).status = '取消'; });
       return { added: p.add.length, cancelled: p.cancel.length };
+    }
+    case 'addPointPayment': {
+      const id = 'h_pt' + Date.now();
+      DB.transactions.push({ id, type: '収入', date: p.date, merchant: '', amount: p.amount, payMonth: p.date.slice(0, 7), status: 'ポイント払い', category: '', categoryBy: '', source: '手入力', memo: 'ポイント' });
+      return { id };
     }
     case 'addIncome': {
       const id = 'h_inc' + Date.now();

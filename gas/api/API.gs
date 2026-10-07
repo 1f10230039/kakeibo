@@ -18,6 +18,7 @@ const WRITABLE_SETTINGS = { '週の始まり': ['月', '日'] };
 const ASSET_ITEMS = { bank: '楽天銀行', nisa: '楽天証券 NISA' }; // 資産の項目（10/6 本人「この2つ」）
 const MAX_ASSET = 1000000000;
 const MAX_ANNIVERSARIES = 30;
+const POINT_PAYMENT = 'ポイント払い'; // 取引の状態：カードの請求をポイントで払った記録（10/7。web/js/calc.js と同じ）
 const ANNIVERSARY_NAME_MAX = 8; // ホームの挨拶「今日は◯◯ですね」が14文字に収まるように（web/js/days.js と同じ）
 
 /** 呼んだ人に見せてよい失敗（合言葉が正しいときだけ返る）。 */
@@ -276,6 +277,24 @@ const ACTIONS = {
       'id': id, '種類': '収入', '利用日': date, '利用先': '', '金額': amount, '支払月': '',
       '状態': '手入力', 'カテゴリ': '', 'カテゴリの決め方': '', '出どころ': '手入力', '対応する速報': '',
       'メモ': (memo || '').trim(), '取り込み日時': now(),
+    }]);
+    return { id };
+  },
+
+  /**
+   * カードの請求をポイントで払った記録（10/7 本人。楽天カードの「ポイントで支払いサービス」）。`{ date, amount }`
+   * 種類＝収入（名前「ポイント」）・状態＝ポイント払い・支払月＝使った日の月（その月の27日の請求から引かれる。受付は毎月12日〜24日ごろ）。
+   * 支出はそのまま。引き落とし予定から引くのは PWA の計算（calc.js）。消すときは手入力と同じ deleteManual。
+   * お店や通信料で使ったポイントは記録しない（カードには残りだけ請求されるので、支出はもう合っている）。
+   */
+  addPointPayment({ date, amount }, { store, now, newId }) {
+    checkDate(date);
+    if (!Number.isInteger(amount) || amount < 1 || amount > 10000000) throw new UserError('amount は 1〜10,000,000 の整数にしてください');
+    const id = newId();
+    store.append(SHEET.TX, [{
+      'id': id, '種類': '収入', '利用日': date, '利用先': '', '金額': amount, '支払月': date.slice(0, 7),
+      '状態': POINT_PAYMENT, 'カテゴリ': '', 'カテゴリの決め方': '', '出どころ': '手入力', '対応する速報': '',
+      'メモ': 'ポイント', '取り込み日時': now(),
     }]);
     return { id };
   },

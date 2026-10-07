@@ -14,7 +14,7 @@ export function incomeRow(t, hidden) {
   return `<button class="row income" data-key="${esc(t.id)}" data-tx="${esc(t.id)}">
     ${incomeMark()}
     <span class="t"><b><span class="cat-name">${esc(t.memo || '入金')}</span>${t.merchant && t.memo ? `<span class="sub">${esc(t.merchant)}</span>` : ''}</b>
-      <small>${d.getMonth() + 1}/${d.getDate()}<span class="badge">収入</span>${t.source === '手入力' ? '<span class="badge">手入力</span>' : ''}</small></span>
+      <small>${d.getMonth() + 1}/${d.getDate()}${C.isPointPayment(t) ? '<span class="badge">ポイント払い</span>' : `<span class="badge">収入</span>${t.source === '手入力' ? '<span class="badge">手入力</span>' : ''}`}</small></span>
     <span class="a pos">+${money(t.amount, hidden)}</span>
   </button>`;
 }

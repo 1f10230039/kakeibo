@@ -36,7 +36,7 @@ export function render(ctx) {
         <div><b>${addRows.length}</b><span>足す候補</span></div>
         <div><b>${cancelRows.length}</b><span>キャンセルかも</span></div>
       </div>
-      ${totalsBlock(V.totals(data.transactions, p), p, hidden)}
+      ${totalsBlock(V.totals(data.transactions, p), p, hidden, C.pointsFor(data.transactions, p.statementMonth))}
       ${p.later.length ? `<p class="note-s">${nextM}月以降の支払い分 ${p.later.length}件は、まだ決まっていないので、次の月の CSV で照らし合わせます。</p>` : ''}
       ${p.skipped.length ? `<p class="note-s">本人以外の利用などの ${p.skipped.length}件は読みませんでした。</p>` : ''}
     </section>
@@ -60,7 +60,7 @@ export function render(ctx) {
 }
 
 /** 合計：シートのその月の支払い分が、明細の利用の合計と同じなら、その月はそろっている（10/6 本人）。 */
-function totalsBlock(t, p, hidden) {
+function totalsBlock(t, p, hidden, points = 0) {
   const m = Number(p.statementMonth.slice(5));
   const state = t.diff === 0 ? '<span class="ok">✓ そろっています</span>'
     : `<span class="ng">${hidden ? '' : esc(C.yen(Math.abs(t.diff)))} ${t.diff < 0 ? '足りません' : '多いです'}</span>`;
@@ -69,6 +69,8 @@ function totalsBlock(t, p, hidden) {
       <div><dt>シートの${m}月払いの合計</dt><dd>${money(t.sheet, hidden)}${state}</dd></div>
       ${t.cancel ? `<div><dt>キャンセルなど ${p.cancels.length}件</dt><dd>−${money(t.cancel, hidden)}</dd></div>` : ''}
       <div class="pay"><dt>差し引いた支払金額${info(`${t.cancel ? 'キャンセルなどの行は、元の利用と同じ金額とは限らないので、シートには入れません。\n' : ''}差し引いた支払金額は、e-NAVI の一覧の支払金額と同じになるはずです。違うときは、ポイントでの支払いなど、CSV に出てこないものがあるのかもしれません。`)}</dt><dd>${money(t.pay, hidden)}</dd></div>
+      ${points ? `<div><dt>ポイント払い${info('この月の請求に使ったポイント（アプリで「ポイント払い」として記録したもの）です。CSV には出てきません。')}</dt><dd>−${money(points, hidden)}</dd></div>
+      <div class="pay"><dt>ポイントを引いた引き落とし</dt><dd>${money(Math.max(0, t.pay - points), hidden)}</dd></div>` : ''}
     </dl>`;
 }
 

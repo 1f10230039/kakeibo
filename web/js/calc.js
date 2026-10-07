@@ -141,18 +141,38 @@ export function debitDate(y, m0) {
 
 /**
  * 次の引き落とし：今月の引き落とし日を過ぎていなければ今月、過ぎていたら来月。
- * 金額は「支払月＝その月」のカードの利用（速報は仮の支払月）の合計。手入力（現金など）は入れない。
+ * 金額は「支払月＝その月」のカードの利用（速報は仮の支払月）の合計から、その月の請求に使ったポイント（ポイント払い）を引いたもの。手入力（現金など）は入れない。
  */
 export function nextDebit(txs, today) {
   let d = debitDate(today.getFullYear(), today.getMonth());
   if (ymd(today) > ymd(d)) d = debitDate(today.getFullYear(), today.getMonth() + 1);
   const payMonth = ym(new Date(d.getFullYear(), d.getMonth(), 1));
-  return { date: d, payMonth, amount: debitAmount(txs, payMonth) };
+  return { date: d, payMonth, amount: debitAmount(txs, payMonth), card: cardAmount(txs, payMonth), points: pointsFor(txs, payMonth) };
 }
 
-/** その支払月（YYYY-MM）の引き落とし額。 */
-function debitAmount(txs, payMonth) {
+/**
+ * カードの請求をポイントで払った記録（10/7 本人。楽天カードの「ポイントで支払いサービス」）。
+ * 収入（名前「ポイント」）に数え、支出はそのまま。支払月（使った日の月）の引き落としから引く。
+ * お店や通信料で使ったポイントは記録しない（カードには残りだけ請求されるので）。
+ */
+export const POINT_PAYMENT = 'ポイント払い';
+export function isPointPayment(t) {
+  return isIncome(t) && t.status === POINT_PAYMENT;
+}
+
+/** その支払月（YYYY-MM）のカードの利用の合計。 */
+function cardAmount(txs, payMonth) {
   return sum(txs.filter(t => isSpend(t) && t.source === 'メール' && t.payMonth === payMonth));
+}
+
+/** その支払月の請求に使ったポイントの合計。 */
+export function pointsFor(txs, payMonth) {
+  return sum(txs.filter(t => isPointPayment(t) && t.payMonth === payMonth));
+}
+
+/** その支払月の引き落とし額（ポイントを引いたあと。0円より下にはしない）。 */
+function debitAmount(txs, payMonth) {
+  return Math.max(0, cardAmount(txs, payMonth) - pointsFor(txs, payMonth));
 }
 
 /** カテゴリごとの合計（多い順、0円は出さない）。 */

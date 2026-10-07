@@ -158,12 +158,16 @@ export const importCsv = (add, cancel) => call('importCsv', { add, cancel });
 export const setBudget = (month, amount) => call('setBudget', { month, amount });
 /** 資産の記録。金額は整数か null（その項目は記録しない／やめる）。3つとも null ならその日の記録をやめる。 */
 export const setAssetRecord = (date, bank, nisa, nisaPrincipal) => call('setAssetRecord', { date, bank, nisa, nisaPrincipal });
-/** 誕生日と記念日をまとめて入れ替える（10/7）。birthday：'MM-DD' か ''、anniversaries：[{ name, md }] */
-export async function setDays(birthday, anniversaries) {
+/** あとから足した手続き。GAS ② が古い（「知らない action」）ときは、貼り直しを頼む文にする。 */
+async function callNew(action, params) {
   try {
-    return await call('setDays', { birthday, anniversaries });
+    return await call(action, params);
   } catch (e) {
     if (e instanceof UserError && e.message === '知らない action です') throw new UserError('GAS ② がまだ古いままです（貼り直して、新しいバージョンでデプロイしてください）');
     throw e;
   }
 }
+/** 誕生日と記念日をまとめて入れ替える（10/7）。birthday：'MM-DD' か ''、anniversaries：[{ name, md }] */
+export const setDays = (birthday, anniversaries) => callNew('setDays', { birthday, anniversaries });
+/** カードの請求をポイントで払った記録（10/7）。entry：{ date, amount } */
+export const addPointPayment = (entry) => callNew('addPointPayment', entry);
