@@ -447,14 +447,28 @@ test('写真：特別な日の写真 → 月の写真 → 季節の写真（あ�
   assert.strictEqual(at(7, null), 'images/hero/summer-morning.webp');
 });
 
+test('写真：本人が選んだとおり（月の写真・今の写真のままの枠は季節の写真・行事と誕生日の写真）', () => {
+  const at = (m, h) => T.heroOf(new Date(2026, m - 1, 10, h), null);
+  assert.strictEqual(at(1, 7), 'images/hero/winter-morning.webp', '1月の朝は今の写真のまま');
+  assert.strictEqual(at(1, 12), 'images/hero/m01-day.webp');
+  assert.strictEqual(at(4, 7), 'images/hero/spring-morning.webp');
+  assert.strictEqual(at(4, 12), 'images/hero/m04-day.webp');
+  assert.strictEqual(at(11, 12), 'images/hero/autumn-day.webp');
+  assert.strictEqual(at(12, 21), 'images/hero/m12-night.webp');
+  for (let m = 1; m <= 12; m++) for (const h of [7, 12, 17, 21]) assert.ok(!at(m, h).includes('undefined'), `${m}月 ${h}時`);
+  S.EVENTS.forEach(e => assert.ok(T.HERO_FILES.has(`event-${e.photo}.webp`), e.key));
+  assert.strictEqual(T.lookOf(new Date(2026, 6, 7, 21)).hero, 'images/hero/event-tanabata.webp');
+  assert.strictEqual(T.lookOf(new Date(2026, 2, 15, 9), [{ kind: '誕生日', name: '誕生日', md: '03-15' }]).hero, 'images/hero/event-birthday.webp');
+});
+
 test('写真：HERO_FILES と images/hero の中身が同じ', () => {
   const dir = fs.readdirSync(new URL('../images/hero/', import.meta.url)).filter(f => f.endsWith('.webp')).sort();
   assert.deepStrictEqual([...T.HERO_FILES].sort(), dir);
 });
 
-test('見た目：秋の夜は C と満月の写真', () => {
+test('見た目：10月の夜は C と10月の夜の写真', () => {
   const look = T.lookOf(new Date(2026, 9, 6, 21, 0));
-  assert.deepStrictEqual([look.theme, look.hero], ['c', 'images/hero/autumn-night.webp']);
+  assert.deepStrictEqual([look.theme, look.hero], ['c', 'images/hero/m10-night.webp']);
 });
 
 let failed = 0;

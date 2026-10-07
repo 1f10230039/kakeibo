@@ -94,9 +94,19 @@ const THEME_BY_SLOT = { morning: 'a', day: 'b', evening: 'a', night: 'c' };
 // 1. 特別な日に写真があれば event-◯◯.webp（時間帯は共通）
 // 2. 月と時間帯の写真 m01-morning.webp 〜 m12-night.webp
 // 3. なければ、季節と時間帯の写真（10/6 の16枚）
+// 写真は本人が候補（docs/design/写真の候補_月と行事.html）から選んだもの（10/7）。月の写真がない枠は、本人が「今の写真のまま」を選んだ枠で、季節の写真が出る
 // あるファイルだけをここに並べる（写真を足したらここにも足す。テストでフォルダの中身と同じか確かめる）
+const MONTH_PHOTOS = {
+  1: ['day', 'night'], 2: ['morning', 'day', 'evening'], 3: ['morning', 'day', 'evening', 'night'], 4: ['day', 'evening'],
+  5: ['morning', 'day', 'night'], 6: ['morning', 'day', 'evening'], 7: ['morning', 'day', 'evening', 'night'], 8: ['morning', 'evening', 'night'],
+  9: ['morning', 'day', 'evening'], 10: ['morning', 'day', 'evening', 'night'], 11: ['evening', 'night'], 12: ['morning', 'day', 'evening', 'night'],
+};
+const EVENT_PHOTOS = ['newyear', 'omisoka', 'christmas', 'setsubun', 'valentine', 'hinamatsuri', 'whiteday', 'aprilfool', 'kodomo',
+  'mothers', 'fathers', 'tanabata', 'obon', 'jugoya', 'halloween', 'toji', 'birthday'];
 export const HERO_FILES = new Set([
   ...['spring', 'summer', 'autumn', 'winter'].flatMap(s => ['morning', 'day', 'evening', 'night'].map(t => `${s}-${t}.webp`)),
+  ...Object.entries(MONTH_PHOTOS).flatMap(([m, slots]) => slots.map(t => `m${m.padStart(2, '0')}-${t}.webp`)),
+  ...EVENT_PHOTOS.map(k => `event-${k}.webp`),
 ]);
 
 export function heroOf(now, special, files = HERO_FILES) {
